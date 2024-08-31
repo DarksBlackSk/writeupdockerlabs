@@ -37,8 +37,12 @@ wfuzz -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowe
 000089181:   403        9 L      28 W       276 Ch      "server-status" 
 
 tras chequear no consigo nada de interes... asi que al volver a revisar mas detalladamente el reporte de nmap me consigo que en el puerto 8161
-esta corriendo un servicio web asi que lo chequeo y me encuentro con ActiveMQ que tiene la version 5.15.15 asi que al buscar informacion en internet
-me consigo un cve: CVE-2023-46604, al buscar informacion de este cve veo que es posible la CRE y que Metasploit lo podemos usar asi que nos vamos a
+esta corriendo un servicio web asi que lo chequeo:
+solocita credenciales asi que probando credenciales comunes, termino accediendo con admin:admin
+
+y me encuentro con ActiveMQ que tiene la version 5.15.15 asi que al buscar informacion en internet
+me consigo un cve: CVE-2023-46604, al buscar informacion de este cve veo que es posible la CRE y que Metasploit lo podemos 
+usar asi que nos vamos a
 metasploit 
 
 msfconsole -q
