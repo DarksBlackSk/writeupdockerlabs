@@ -1,4 +1,5 @@
 # Escaneo de puertos, servicios y version
+nmap -Pn -n -sS -p- -sV --script vuln --min-rate 2000 --open -vvv -oN nmap 172.17.0.2
 
 22/tcp open  ssh     syn-ack ttl 64 OpenSSH 9.2p1 Debian 2+deb12u2 (protocol 2.0)
 80/tcp open  http    syn-ack ttl 64 Apache httpd 2.4.59 ((Debian))
@@ -44,7 +45,7 @@ gobuster dir -u http://172.17.0.2 -w /usr/share/wordlists/seclists/Discovery/Web
 Progress: 1661144 / 1661152 (100.00%)
 ===============================================================
 
-vemos que tenemos este directorio http://asucar.dl/wp-login.php?action=register pero al intentar acceder, no podemos asi que vamos agregar el 
+vemos que tenemos este dominio http://asucar.dl/wp-login.php?action=register pero al intentar acceder, no podemos asi que vamos agregar el 
 dominio asucar.dl a /etc/hosts
 
 172.17.0.2	asucar.dl
@@ -155,20 +156,10 @@ para transfererirnos la clave rsa
 
 scp curiosito@172.17.0.2:/home/curiosito/.ssh/id_rsa /home/darks/Documents/dockerlab/asucar
 
-ya con la clave rsa en nuestro equipo verificamos los permisos que tiene el archiivo que contiene la clave, si tiene permisos se los quitamos todos
+ya con la clave rsa en nuestro equipo verificamos los permisos que tiene el archiivo, si tiene permisos se los quitamos todos
 
 chmod 0000 id_rsa			| aqui le quitamos todos los permisos que tenga 
 
 ahora si, pa dentro
 
 ssh -i id_rsa root@172.17.0.2
-
-
-
-Nota: si la clave rsa tiene permisos esta no nos va a servir, asi que debemos quitarselos para que pueda establecer la conexion con root
-
-
-
-
-
-
