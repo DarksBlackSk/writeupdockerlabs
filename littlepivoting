@@ -331,7 +331,7 @@ para que nos pueda funcionar una reverse shell.. hagamos un nuevo diagrama
      M.A.                               M.1                             M.2                             M3
 server Chisel                      chisel cliente		
   puerto 90				socat			      chisel				
- netcat 5000	      <----------       socat       <--------	       socat          <---------  reverse shell php
+ netcat 4444	      <----------       socat       <--------	       socat          <---------  reverse shell php
 ------------------------------------------------------------------------------------------------------------------
 
 Ok, como vemos en el diagrama, la reverse shell debe ser enviada desde M3 a M2 y con socat redireccionarlo desde M2 a M1 
