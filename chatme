@@ -91,7 +91,7 @@ directorio con el sigueinte contenido:
 | chmod u+s /bin/bash
 ========================
 
-luego de esto vamos a ejecutar el comando {chmod /bin/bash} definido en el archivo de configuracion
+luego de esto vamos a ejecutar el comando {chmod u+s /bin/bash} definido en el archivo de configuracion
 .procmailrc de la siguiente manera..
 
 echo 'hola' | sudo /usr/bin/procmail -m .procmailrc
