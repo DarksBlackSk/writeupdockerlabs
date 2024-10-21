@@ -379,7 +379,7 @@ primero nos clonamos el repositorio necesario
 
 git clone https://github.com/synacktiv/php_filter_chain_generator.git
 cd php_filter_chain_generator
-chmod +x php_filter_chain_generator
+chmod +x php_filter_chain_generator.py
 
 intentare ir ejecutando comandos:
 
