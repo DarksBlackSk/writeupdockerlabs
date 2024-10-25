@@ -79,7 +79,7 @@ Using default input encoding: UTF-8
 Loaded 1 password hash (PKZIP [32/64])
 Will run 8 OpenMP threads
 Press 'q' or Ctrl-C to abort, almost any other key for status
-greenday         (respeta.zip/oculto.txt)     
+***********         (respeta.zip/oculto.txt)     
 1g 0:00:00:00 DONE (2024-10-24 13:36) 50.00g/s 819200p/s 819200c/s 819200C/s 123456..cowgirlup
 Use the "--show" option to display all of the cracked passwords reliably
 Session completed. 
@@ -115,7 +115,7 @@ wrote extracted data to "passwd.zip".
 
 se extrae un archivo llamado pass que al leerlo contiene unas credenciales
 
-hackeada:denuevo
+***********:***********
 
 para el servicio ssh no son validas asi que por ahora no las podre usar, asi que continuo con el servicio
 web, el cual aun no he inspeccionado....
@@ -168,7 +168,7 @@ http://dockerlabs.es tambien me lleva a la plantilla de apache
 
 http://trackedvuln.dl/ al acceder me solicita credenciales, asi que pruebo las que consegui anteriormente
 
-hackeada:denuevo
+***********:***********
 
 despues de colocar las credenciales me lleva tambien a la plantilla de apache...
 
@@ -194,7 +194,7 @@ aqui observo Authorization: Basic aGFja2VhZGE6ZGVudWV2bw==
 que me parece esta codeado en base64 asi que lo decodifico
 
 echo 'aGFja2VhZGE6ZGVudWV2bw==' |base64 -d
-hackeada:denuevo
+***********:***********
 
 son las credenciales, asi que deduzco para poder realizar fuzzing, debo pasarle la cabecera Authorization
 
@@ -223,7 +223,7 @@ Finished
 ===============================================================
 
 al acceder en http://trackedvuln.dl/index.php me muestra el mismo contenido de http://172.17.0.2/index.php pero aqui
-no esta funcionan los enlaces de la barra lateral, asi que pruebo si el /index.php es vulnerable a un LFI con wfuzz
+no esta funcionando los enlaces de la barra lateral, asi que pruebo si el /index.php es vulnerable a un LFI con wfuzz
 
 wfuzz -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -u "http://trackedvuln.dl/index.php?FUZZ" -H "Authorization: Basic aGFja2VhZGE6ZGVudWV2bw==" --hh=893
 
@@ -355,7 +355,7 @@ feliz hack de firstatack
 +++++++++++++++++++++++++++++++++++++++++++++
 
 le consulte a la IA que eran dichos caracteres y resulta ser brailler, asi que busque 
-en internet un decoder y al descifrarlo el resultado es: practicacreandoretos
+en internet un decoder y al descifrarlo el resultado es: ***********
 
 intente las credenciales por ssh contra el otro user del sistema, maria, pero no dio resultado
 intente con el user norberto y logre acceder
@@ -388,13 +388,13 @@ drwxrwxr-x 3 maria maria 4096 Jul 10 01:15 .local
 -rw-r--r-- 1 maria maria  807 Jul  9 23:08 .profile
 
 cat .mipass
-maria:asientiendesmejor
+maria:***********
 Donde podre escribir
 
 como tengo las credenciales de maria, me conecto via ssh:
 
 ssh maria@172.17.0.2
-pass:asientiendesmejor
+pass:***********
 
 ahora si obtengo una shell completa del user maria
 
@@ -468,6 +468,7 @@ Desde mi maquina local
 _______________________
 
 ssh-keygen -t rsa -b 4096
+
 Generating public/private rsa key pair.
 Enter file in which to save the key (/home/darks/.ssh/id_rsa): 
 Enter passphrase for "/home/darks/.ssh/id_rsa" (empty for no passphrase): 
