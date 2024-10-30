@@ -1,6 +1,6 @@
 # Escaneo de Puertos, Servicios y Versiones
-
-''''nmap -Pn -n -sS -p- --open -sCV --min-rate 5000 172.17.0.2 -oN nmap
+```
+nmap -Pn -n -sS -p- --open -sCV --min-rate 5000 172.17.0.2 -oN nmap
 Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-10-30 14:24 -03
 Nmap scan report for 172.17.0.2
 Host is up (0.0000020s latency).
@@ -18,4 +18,4 @@ Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
 
 Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
 Nmap done: 1 IP address (1 host up) scanned in 7.22 seconds
-''''
+```
