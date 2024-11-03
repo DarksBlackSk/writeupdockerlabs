@@ -217,6 +217,8 @@ asi que creo un archivo que contenga este hash en mi maquina atacante y se la pa
 
 y logre conseguir la password del user darksblack asi que puedo cambiar de user
 
+# User darksblack
+
 ![Screenshot From 2024-11-02 15-36-47](https://github.com/user-attachments/assets/6bbff8b6-158b-44fe-ac64-fe12d1575739)
 
 ```
@@ -244,6 +246,8 @@ User maci may run the following commands on 9c13e159e6ea:
     (pepe) NOPASSWD: /usr/sbin/exim
 
 ```
+# User maci
+
 podemos ejecutar el binario exim como el user pepe, en este punto me tomo mucho tiempo de investigacion, prueba y error pero al final consegui respuesta en la propia
 documentacion del binario, ya que los exploit que consegui era para una ejecucion remota de comandos los cuales no me servirian...
 la informacion la consegui en este enlace: `https://www.exim.org/exim-html-current/doc/html/spec_html/ch-string_expansions.html` 
