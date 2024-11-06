@@ -28,7 +28,7 @@ chequeando el servicio web, me consigo con la plnatilla de apache
 
 asi que realizo fuzzing web
 
-# Fuzzinf Web
+# Fuzzing Web
 
 ```ruby
  feroxbuster -u http://172.17.0.2 -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-lowercase-2.3-medium.txt -s 200,301,302 -x txt,php,bak,db,py,html,js,jpg,png,git -t 200 -d 10 --random-agent --no-state
