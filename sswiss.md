@@ -221,8 +221,9 @@ observo el trafico de la red con `tcpdump`
 
 ahora si puedo ver el trafico de red pero con mas informacion, tipo de conexion `UDP` puerto `7777`
 
+![Screenshot From 2024-11-12 11-42-42](https://github.com/user-attachments/assets/6c07f3ab-c745-4a16-a93f-2791d2c8ec10)
 
-![image](https://github.com/user-attachments/assets/a5d15b3e-6f6f-4f12-bf59-88d57bfaa6ec)
+
 
 recibo la cadena:
 
