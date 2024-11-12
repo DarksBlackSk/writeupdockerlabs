@@ -190,16 +190,20 @@ no consegui nada de ningun usuario que me permitiera la escalada, pero si conseg
 ejecuto el binario pero no pasa nada aparentemente, asi que levanto un server con python y descargo el binario en mi maquina para analizarlo
 
 
-![Screenshot From 2024-11-12 00-23-30](https://github.com/user-attachments/assets/e08f2b99-de7a-45fd-a826-2fc648b5f641)
+![image](https://github.com/user-attachments/assets/58a03d2b-6425-4593-8dcd-05751db17bf5)
+
 
 ya por aqui puedo ver cositas, una direccion `ip= 172.17.0.188` un mensaje de error `Error al enviar datos` asi que parece que el binario envia informacion a la
-ip `172.17.0.188`
+ip `172.17.0.188` y por otro lado me parece que tiene una cadena codificada en `base64` o `base32`, pero despues de intentar decodificar, resulta ser ilegible, asi
+que me quedo con la `ip` y el mensaje de error para ejecutar el binario y analizar la red
 
 
-![Screenshot From 2024-11-12 00-32-34](https://github.com/user-attachments/assets/e544e448-7cdc-4157-9c0f-e676aa8355c0)
+![image](https://github.com/user-attachments/assets/988fd292-4699-45a8-96b6-40fe417c1861)
 
 
-en efecto, observando el trafico de la red, el binario envia informacion a la ip `172.17.0.188` asi que cambiare mi ip por esa
+por lo que observo, al ejecutar el binario y chequear el trafico de red se puede ver como se realiza una solicitud `arp` preguntando por la ip `172.17.0.188`
+esto con el fin de poder comunicarse con ella a nivel del enlace de datos, asi que cambiare mi ip por la ip `172.17.0.188`
+
 
 ```ruby
 ip addres del 172.17.0.200/16 dev docker0 
@@ -207,12 +211,15 @@ ip addres del 172.17.0.200/16 dev docker0
 ```ruby
 ip addres add 172.17.0.188/16 dev docker0
 ```
-vuelvo a observar el trafico 
+despues de cambiar de `ip` e intentar ejecutar el binario y observar el trafico, por alguna razon no puedo ver nada, como si no existiera trafico de red y la conexion
+con el server se cayo, asi que vuelvo a conectarme al server y esta vez desde el mismo server ejecuto el binario y desde mi maquina (ya teniendo la ip `172.17.0.188`)
+observo el trafico de la red con `tcpdump`
 
-![image](https://github.com/user-attachments/assets/5369f1c7-fad9-4e2d-89bc-509629c925fc)
 
-ahora que cambie a la `ip` donde el binario envia informacion y vuelvo a dumpear las conexiones me refleja mas informacion como el puerto `4444` y que es `UDP` 
-asi que me coloco en escucha por dicho puerto a ver que recibo
+![image](https://github.com/user-attachments/assets/6b193667-528f-4b24-a1c5-4539b6c77319)
+
+
+ahora si puedo ver el trafico de red pero con mas informacion, tipo de conexion `UDP` puerto `7777`
 
 
 ![image](https://github.com/user-attachments/assets/a5d15b3e-6f6f-4f12-bf59-88d57bfaa6ec)
@@ -327,7 +334,7 @@ guardo los cambios y espero unos segundos mientra el script `systm.sh` vuelve a 
 
 ![image](https://github.com/user-attachments/assets/1234103e-7024-433a-9990-4ce20f389970)
 
-ya asignado el Bit SUID solo queda pasar a `root`
+ya asignado el BIT SUID solo queda pasar a `root`
 
 ![image](https://github.com/user-attachments/assets/55698055-5086-4d90-b265-cc274246b62d)
 
