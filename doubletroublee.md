@@ -236,7 +236,7 @@ tenemos el archivo que solicita password para ser descomprimido por lo que inten
 zip2john archivo0.zip > hashzip # extraigo el hash
 ```
 
-le lo paso a `john`
+se lo paso a `john`
 
 ```ruby
 john --wordlist=/usr/share/wordlists/rockyou.txt hashzip
@@ -348,7 +348,7 @@ User darksblack may run the following commands on e55b7a4cbc6e:
     (juan) NOPASSWD: /usr/bin/python3 /home/juan/shell.py
     (juan) NOPASSWD: /bin/cat /home/juan/shell.py
 ```
-puedo ejecutar un script de python como el user `jaun` que pertenece a el mismo user, pero tambien puedo leerlo, asi que primero lo leere a ver de que trata el script
+puedo ejecutar un script en python como el user `juan`, pero tambien puedo leerlo, asi que primero lo leere a ver de que trata el script
 
 ```ruby
 sudo -u juan /bin/cat /home/juan/shell.py
