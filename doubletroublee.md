@@ -10,24 +10,23 @@ solo existe el puerto 80, asi que chequeare el servicio web
 
 ![image](https://github.com/user-attachments/assets/8fa08ce1-773d-4c32-a531-5433570d48e3)
 
-me consigo un panel de login que al probar una inyeccion basica logro el acceso (bueno, aun no, como se observa cuenta un el sistema de doble autenticacion)
+me consigo un panel de login que al probar una inyeccion basica logro el acceso (bueno, aun no, como se observa cuenta con un sistema de doble autenticacion)
 
 ![image](https://github.com/user-attachments/assets/6d35c101-cb15-4191-b9b3-55417f04a06b)
 
-aqui intentare bypassear el `2FA`, lo primero es conocer despues de cuantos intentos fallidos me saca de la sesion y despues de testear, al 4to intento fallido me saca y tengo que
-volver a colocar las credenciales, otro dato que necesitamos es de cuantos digitos el codigo `2FA` que es de 4 numeros, ya sabiendo estos datos abro `BurpSuite` para realizar el bypass
+aqui intentare bypassear el `2FA`, lo primero es conocer despues de cuantos intentos fallidos me saca de la sesion y despues de testear, al 4to intento fallido me saca, otro dato que necesitamos es de cuantos digitos el codigo `2FA` que es de 4 numeros, ya sabiendo estos datos abro `BurpSuite` para realizar el bypass
 ubicandome en `proxy >> HTTP history` para chequear si las solicitudes se van capturando cuando inicie sesion
 
 
 ![image](https://github.com/user-attachments/assets/367824c2-7003-40b0-80b3-314e3be58c70)
 
-el navegador lo configuramos para que pase a traves del proxy de `BurpSuite` (sin activar la intercecion de peticiones en burpsuite) y a continuacion vamos a:
+el navegador lo configuramos para que pase a traves del proxy de `BurpSuite` (sin activar la intercepción de peticiones en burpsuite) y a continuacion vamos a:
 
 ```bash
 1) acceder a http://172.17.0.2 [Solicitud GET panel de login]
 2) iniciar sesion (a traves de la inyeccion sql como la primera vez) [Solicitud POST inicio de sesion]
 3) pagina de validacion de doble Autenticacion [Solicitud GET 2FA]
-4 probamos cualquier nuemero de 4 digitos en el `2FA` [Solicitud POST 2FA]
+4 probamos cualquier nuemero de 4 digitos en el 2FA [Solicitud POST 2FA]
 ```
 
 como resultado debemos tener en el historico de `Burpsuite` lo siguiente:
