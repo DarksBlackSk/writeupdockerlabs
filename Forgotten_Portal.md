@@ -182,7 +182,8 @@ la `passphrase` se encuentra en el reporte de `incidencias`
 
 
 
-```sudo -l
+```
+sudo -l
 
 Matching Defaults entries for bob on e3bff6e1986b:
     env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin, use_pty
