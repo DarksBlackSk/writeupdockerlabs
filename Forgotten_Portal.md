@@ -25,7 +25,8 @@ Nmap done: 1 IP address (1 host up) scanned in 7.53 seconds
 
 comienzo chequeando el servicio web
 
-![image](https://github.com/user-attachments/assets/232202bc-57e8-46c9-8f93-a854a2b9d69c)
+![image](https://github.com/user-attachments/assets/a49fc61f-ba0c-481f-bf88-90fd0644778a)
+
 
 realizo fuzzing web
 
@@ -69,12 +70,8 @@ by Ben "epi" Risher 🤓                 ver: 2.11.0
 [####################] - 67s  2491548/2491548 37308/s http://172.17.0.2/ 
 [####################] - 0s   2491548/2491548 1245774000/s http://172.17.0.2/uploads/ => Directory listing (add --scan-dir-listings to scan)
 ```
-veo que existe el directorio `/uploads` por lo que imagino que de alguna forma podre cargar archivos solo que no veo el panel de carga, asi que despues de chequear el script `js` 
-observo algo interesante
-
-![image](https://github.com/user-attachments/assets/fde9add8-ea37-402b-8af9-a343a5c6ee31)
-
-si que existe un panel de carga y despues de varios testeos accedo en `http://172.17.0.2/#fileUpload` y al chequear su codigo fuente observo
+veo que existe el directorio `/uploads` por lo que imagino que de alguna forma podre cargar archivos solo que no veo el panel de carga, si chequeo el codigo fuente consigo el panel de
+carga
 
 ![image](https://github.com/user-attachments/assets/a0f159d4-159e-4081-9f4d-69fc001aabfe)
 
