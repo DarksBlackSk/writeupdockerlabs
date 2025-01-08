@@ -91,33 +91,88 @@ ahora como el user `flow` puedo ejecutar un binario como `root`
 
 ![image](https://github.com/user-attachments/assets/1ef82770-c76c-4aa6-a12e-f00c79bc8ed2)
 
-![image](https://github.com/user-attachments/assets/134c810e-bc2b-4022-97e2-c93cabae60d4)
+![image](https://github.com/user-attachments/assets/022e9812-3921-4649-9b66-fe730f45d8b5)
 
-continuo testeando pero esta como raro
+algo interesante que veo es que el binario al no ser ejecutado como `root` lanza un mensaje adicional indicando que
+no pudo abrir el archivo por permisos, asi que primero le hare reversing y analizarlo mejor 
 
-![image](https://github.com/user-attachments/assets/70912cba-395b-4aa2-a1a4-afcf77bd1e56)
+![image](https://github.com/user-attachments/assets/2cd44df3-0662-4bee-b28c-6dcd75bb3218)
 
-dice que la clave sera `root` para acceder al modo administrador, pero si coloco `root` no funciona asi que lo enviare a mi maquina para examinarlo mejor
+aqui puedo ver varios detalles dentro de la funcion `main`, comenzando por lo que parece ser que el tamano del buffer que 
+almacena la entrada del usuario es de 76 byte, ademas veo que se hace uso de un condicional `if` para determinar el flujo del
+programa dependiendo la entrada del usuario, por un lado si la entrada del usuario es igual a `0x726f6f74` entonces imprime el mensaje `"estas en modo administrador"` y llama a continuacion las funciones `write_key_to_file` & `execute_command` (al parecer al acceder al modo administrador es posible la ejecucion de comandos), en caso de ser la entrada diferente a `0x726f6f74` entonces imprime el mensaje `"estas en modo usuario"` y llama a las funciones `write_key_to_file` y `user_mode`.
 
-![image](https://github.com/user-attachments/assets/2ed714bd-612e-4482-afb2-b120dca82f0c)
+Ahora analizare la funcion `write_key_to_file` que es la que me interesa ya que el binario interactua con un archivo (me di cuenta al ejecutar el binario sin sudo)
 
-![image](https://github.com/user-attachments/assets/dd089e0e-1500-4099-b88e-484f2bfe6b63)
+![image](https://github.com/user-attachments/assets/6021093e-1e7f-41b8-a7fe-3a1695938e86)
 
-es un binario `x64` que no cuenta con 2 protecciones asi que chequeare si llega ser vulnerable a un desbordamiento de buffer
+ahora en la funcion `write_key_to_file` puedo ver el archivo con el que esta interactuando >> `"/tmp/key_output.txt"`; ahora si reviso el archivo observo que imprime el valor de la `key`
 
-![image](https://github.com/user-attachments/assets/65904269-4d5b-46dd-8e5a-0387ec1ab2eb)
+![image](https://github.com/user-attachments/assets/230946cc-45a8-4749-bdf0-f15f6c18c614)
 
-ocurrio un fallo de segmentacion, lo cual podria ser un indicio de un posible desbordamiento de buffer
+ahora intentare testear a ver si es posible cambiar el valor de la key
 
-## BUFFER OVERFLOW
+![image](https://github.com/user-attachments/assets/575ae2e7-454f-4250-9001-1f1e5e7981e9)
 
-comienzo desactivando el ASLR y ejecutando el binario a traves del depurador `gdb`
+imprime un valor distinto, es decir, que a traves del input que le pasemos al binario varia la `key` y si paso el valor de la `key` a hexadecimal veo que su valor es `41414141`
 
-```ruby
-sysctl -w kernel.randomize_va_space=0 # Desactivando temporalmente el ASLR
+![image](https://github.com/user-attachments/assets/b197144b-bfca-4ba2-8c95-6a997d57ec3b)
+
+esto quiere decir que la key la he sobreescrito con las A's que pase en el input, y si recordamos el tamano del buffer 
+que observamos en la funcion `main` indica que es de 76 byte por lo que le pasare 76 A y una B al final para ver si llego a sobreescribir la key con el valor de B  
+
+![image](https://github.com/user-attachments/assets/113e9977-c19e-41a9-b011-c0d901a861f8)
+
+la key ahora vale 66 y si lo paso a hexadecimal su valor es 42, es decir, B
+
+![image](https://github.com/user-attachments/assets/0963b8b4-bf81-4b46-a513-90f90eda99fd)
+
+como ya se que puedo manipular el valor de la `key` le pasare lo que solicita el binario `Tu clave sera "root" para entrar al modo administrador`, y como vimos en la funcion `main` espera `0x726f6f74` que es en efecto `root` asi que le envio el siguiente payload
+
+```bash
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAtoor
 ```
 
-# Writeup en construccion, conuare ...
+![image](https://github.com/user-attachments/assets/107bdb26-496f-41f1-9e38-df7a6aff0165)
+
+he logrado acceder al modo administrador donde puedo ejecutar comandos, le paso `toor` y no `root` ya que se debe invertir el valor debido a que las maquinas actuales tienen arquitecturas `Little-Endian`, es decir, los bytes de una palabra se almacenan en orden inverso, del menos significativo al más significativo.
+
+ahora solo me queda ejecutar un `/bin/bash` para obtener la `shell` como `root`
+
+![image](https://github.com/user-attachments/assets/4484dce4-9e34-4906-842a-75441f8a9924)
+
+### PWNED-ROOT
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
