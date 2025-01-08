@@ -139,7 +139,7 @@ he logrado acceder al modo administrador donde puedo ejecutar comandos, le paso 
 
 ahora solo me queda ejecutar un `/bin/bash` para obtener la `shell` como `root`
 
-![image](https://github.com/user-attachments/assets/4484dce4-9e34-4906-842a-75441f8a9924)
+![image](https://github.com/user-attachments/assets/397605f5-83cf-436b-8da0-4610eeff9b28)
 
 ### PWNED-ROOT
 
