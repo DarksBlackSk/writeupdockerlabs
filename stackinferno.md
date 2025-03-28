@@ -575,6 +575,13 @@ Hemos saltado la verificación y tras probar las credenciales, las únicas que r
 
 ### Carlos
 
+```bash
+cat user.txt
+```
+```bash 
+60947fe8685231c7e229d0dda779aeda
+```
+
 ![image](https://github.com/user-attachments/assets/701f6737-d4fe-426f-8f52-2220289b3446)
 
 vemos que el servicio cron esta corriendo asi que chequeamos que corre
