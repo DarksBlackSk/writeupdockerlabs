@@ -110,7 +110,7 @@ obtenemos la revershell
 
 tratamos la tty
 
-``bash
+```bash
 script /dev/null -c bash 
 ctrl+z
 stty raw -echo; fg
